@@ -1,0 +1,14 @@
+# All personal state lives in ~/.kg-trainer (or $KG_TRAINER_HOME), never here.
+# These entries exist so a stray copy inside the repo is never committed.
+hevy-key
+profile.json
+weight-log.csv
+checkins.jsonl
+data/
+plans/
+dashboard/
+preview
+.claude/
+__pycache__/
+*.pyc
+.DS_Store

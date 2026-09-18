@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+  /* Dark-only board. Sequential ramp: one hue, monotone lightness, brighter =
+     bigger. On a dark surface the darkest step is the one that recedes, so the
+     ramp runs dark->light as magnitude rises. Validated against this surface. */
+  :root{
+    --surface:#131312; --surface-2:#1c1c1a; --surface-3:#242422;
+    --ink:#ffffff; --ink-2:#c3c2b7; --ink-3:#8a8a80;
+    --s1:#184f95; --s2:#256abf; --s3:#3987e5; --s4:#6da7ec; --s5:#9ec5f4;
+    --accent:#3987e5;
+    --grid:#2a2a27;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--surface);color:var(--ink)}
+  body{font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+       -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 16px 96px}
+  h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.02em}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.14em;color:var(--ink-3);
+     font-weight:700;margin:56px 0 16px}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:800;
+       letter-spacing:-.04em}
+
+  /* ---- hero ---- */
+  .hero{position:relative;margin:0 -16px 8px;min-height:340px;display:flex;
+        align-items:flex-end;overflow:hidden;background:var(--surface-2)}
+  .hero .frames{position:absolute;inset:0}
+  .hero .frames img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+        object-position:center 30%;filter:grayscale(.35) contrast(1.08)}
+  .hero-grad{position:absolute;inset:0;
+        background:linear-gradient(90deg,var(--surface) 8%,rgba(19,19,18,.72) 45%,rgba(19,19,18,.25) 100%)}
+  .hero-in{position:relative;padding:32px 16px}
+  .hero-in .who{font-size:clamp(34px,6vw,64px);line-height:1;margin-bottom:8px}
+  .hero-in .goal{color:var(--ink-2);max-width:46ch}
+  .hero-stat{margin-top:20px;display:flex;align-items:baseline;gap:10px}
+  .hero-stat b{font-size:clamp(40px,7vw,72px);line-height:1;color:var(--accent)}
+  .hero-stat span{color:var(--ink-2);font-size:14px}
+
+  /* ---- crossfade: two frames of the same lift, looping ---- */
+  .frames{position:relative}
+  .frames img{opacity:0;animation:xf 3.4s ease-in-out infinite}
+  .frames img:nth-child(2){animation-delay:1.7s}
+  @keyframes xf{0%,44%{opacity:1}56%,100%{opacity:0}}
+  @media (prefers-reduced-motion:reduce){
+    .frames img{animation:none;opacity:0}
+    .frames img:first-child{opacity:1}
+  }
+
+  /* ---- stat tiles ---- */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px}
+  .tile{background:var(--surface-2);border-radius:12px;padding:18px}
+  .tile .v{font-size:38px;line-height:1.05;display:block}
+  .tile .k{color:var(--ink-3);font-size:11px;text-transform:uppercase;
+           letter-spacing:.1em;font-weight:700;margin-top:6px}
+
+  /* ---- plan tabs ---- */
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+  .tabs button{background:var(--surface-2);color:var(--ink-2);border:0;border-radius:999px;
+    padding:9px 16px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+  .tabs button[aria-selected=true]{background:var(--accent);color:#fff}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:12px}
+  .card{background:var(--surface-2);border-radius:12px;overflow:hidden}
+  .card .shot{position:relative;aspect-ratio:4/3;background:var(--surface-3)}
+  .card .shot img{width:100%;height:100%;object-fit:cover;filter:grayscale(.3) contrast(1.06)}
+  .card .noshot{position:absolute;inset:0;display:grid;place-items:center;text-align:center;
+    padding:14px;color:var(--ink-3);font-size:12px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.1em}
+  .card .body{padding:14px}
+  .card .nm{font-weight:700;font-size:14px;line-height:1.3}
+  .card .rx{margin-top:8px;font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:700}
+  .card .last{margin-top:4px;font-size:12px;color:var(--ink-3)}
+  .card .cue{margin-top:8px;font-size:12px;color:var(--ink-2);font-style:italic}
+
+  /* ---- charts ---- */
+  .heat{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,11px);gap:3px;
+        overflow-x:auto;padding-bottom:6px}
+  .heat i{width:11px;height:11px;border-radius:2px;background:var(--surface-3);display:block}
+  .legend{display:flex;align-items:center;gap:6px;margin-top:10px;color:var(--ink-3);font-size:11px}
+  .legend i{width:11px;height:11px;border-radius:2px;display:block}
+  .multi{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .panel{background:var(--surface-2);border-radius:12px;padding:16px}
+  .panel h3{font-size:13px;margin-bottom:2px}
+  .panel .sub{color:var(--ink-3);font-size:11px;font-family:var(--mono);margin-bottom:10px}
+  svg{display:block;width:100%;overflow:visible}
+  .gl{stroke:var(--grid);stroke-width:1}
+  .ax{fill:var(--ink-3);font-size:10px;font-family:var(--mono)}
+  .bars text{fill:var(--ink-2);font-size:12px}
+  .bars .val{fill:var(--ink);font-family:var(--mono);font-weight:700;font-size:12px}
+  .flag{fill:var(--ink-3);font-size:10px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--grid)}
+  th{color:var(--ink-3);font-size:11px;text-transform:uppercase;letter-spacing:.1em}
+  td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+  .note{color:var(--ink-3);font-size:12px;margin-top:10px}
+
+  /* ---- tooltip ---- */
+  #tip{position:fixed;z-index:9;pointer-events:none;opacity:0;transition:opacity .1s;
+    background:#000;border:1px solid var(--grid);border-radius:8px;padding:8px 10px;
+    font-size:12px;line-height:1.45;max-width:260px;box-shadow:0 8px 24px rgba(0,0,0,.6)}
+  #tip b{font-family:var(--mono)}
+  [data-tip]{cursor:crosshair}
+</style>
+</head>
+<body>
+<div id="tip" role="tooltip"></div>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="frames" id="heroShot"></div>
+    <div class="hero-grad"></div>
+    <div class="hero-in">
+      <h1 class="who" id="who"></h1>
+      <p class="goal" id="goal"></p>
+      <div class="hero-stat"><b class="num" id="heroNum"></b><span id="heroCap"></span></div>
+    </div>
+  </header>
+
+  <h2>At a glance</h2>
+  <div class="tiles" id="tiles"></div>
+
+  <h2 id="planH">The plan</h2>
+  <div class="tabs" id="tabs" role="tablist"></div>
+  <div class="cards" id="cards"></div>
+
+  <h2>Consistency</h2>
+  <div class="heat" id="heat"></div>
+  <div class="legend">Less
+    <i style="background:var(--surface-3)"></i><i style="background:var(--s1)"></i>
+    <i style="background:var(--s2)"></i><i style="background:var(--s3)"></i>
+    <i style="background:var(--s4)"></i><i style="background:var(--s5)"></i>More
+    <span style="margin-left:10px">shaded by minutes trained</span>
+  </div>
+
+  <h2>Estimated 1RM over time</h2>
+  <div class="multi" id="e1rm"></div>
+  <p class="note">Epley, from working sets of 10 reps or fewer. Each panel is one lift, so
+     no legend is needed — the heading names it.</p>
+
+  <h2>Sets per muscle · last 8 weeks</h2>
+  <div class="panel"><div class="bars" id="muscle"></div></div>
+  <p class="note" id="muscleNote"></p>
+
+  <h2>Personal records</h2>
+  <div class="panel" style="padding:4px 0"><table id="prs"></table></div>
+
+  <p class="note" id="stamp"></p>
+</div>
+
+<script src="data.js"></script>
+<script>
+const D = window.KG;
+const RAMP = ['--s1','--s2','--s3','--s4','--s5'];
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const el = (t,a={},kids=[]) => { const n=document.createElement(t);
+  for(const [k,v] of Object.entries(a)){ if(k==='class')n.className=v;
+    else if(k==='html')n.innerHTML=v; else n.setAttribute(k,v); }
+  for(const c of [].concat(kids)) n.append(c); return n; };
+const fmt = n => n>=1e6 ? (n/1e6).toFixed(1)+'M' : n>=1e4 ? Math.round(n/1e3)+'k' : n>=1e3 ? (n/1e3).toFixed(1)+'k' : String(n);
+
+/* ---------- tooltip: one delegated listener for every [data-tip] ---------- */
+const tip = document.getElementById('tip');
+addEventListener('mousemove', e => {
+  const t = e.target.closest('[data-tip]');
+  if(!t){ tip.style.opacity=0; return; }
+  tip.innerHTML = t.getAttribute('data-tip');
+  tip.style.opacity = 1;
+  const r = tip.getBoundingClientRect();
+  let x = e.clientX+14, y = e.clientY-r.height-10;
+  if(x+r.width > innerWidth-8) x = e.clientX-r.width-14;
+  if(y < 8) y = e.clientY+16;
+  tip.style.left = x+'px'; tip.style.top = y+'px';
+});
+
+/* ---------- hero ---------- */
+function frames(imgs, alt){
+  return imgs && imgs.length
+    ? imgs.slice(0,2).map(src => el('img',{src, alt, loading:'lazy'}))
+    : null;
+}
+document.getElementById('who').textContent = D.name;
+document.getElementById('goal').textContent = D.goal || '';
+const h = D.hero;
+if(h){
+  const f = frames(h.images, h.exercise);
+  if(f) document.getElementById('heroShot').append(...f);
+  document.getElementById('heroNum').textContent = h.value;
+  document.getElementById('heroCap').textContent = h.caption;
+}
+
+/* ---------- stat tiles ---------- */
+const tiles = document.getElementById('tiles');
+for(const t of D.tiles)
+  tiles.append(el('div',{class:'tile','data-tip':t.tip},[
+    el('span',{class:'v num'},[t.value]), el('div',{class:'k'},[t.label])]));
+
+/* ---------- plan tabs ---------- */
+const tabs = document.getElementById('tabs'), cards = document.getElementById('cards');
+function drawPlan(i){
+  cards.replaceChildren();
+  [...tabs.children].forEach((b,j)=>b.setAttribute('aria-selected', j===i));
+  for(const ex of D.routines[i].exercises){
+    const f = frames(ex.images, ex.name);
+    const shot = el('div',{class:'shot'});
+    if(f){ const w=el('div',{class:'frames'},f); w.style.position='absolute'; w.style.inset=0; shot.append(w); }
+    else shot.append(el('div',{class:'noshot'},[ex.name]));
+    cards.append(el('div',{class:'card','data-tip':ex.tip},[shot,
+      el('div',{class:'body'},[
+        el('div',{class:'nm'},[ex.name]),
+        el('div',{class:'rx'},[ex.rx]),
+        el('div',{class:'last'},[ex.last]),
+        ...(ex.cue ? [el('div',{class:'cue'},[ex.cue])] : [])])]));
+  }
+}
+if(D.routines.length){
+  D.routines.forEach((r,i)=>{
+    const b = el('button',{role:'tab'},[r.title]);
+    b.onclick = ()=>drawPlan(i); tabs.append(b);
+  });
+  drawPlan(0);
+} else {
+  document.getElementById('planH').style.display='none';
+  cards.append(el('p',{class:'note'},['No routines in Hevy yet — build a plan and push it.']));
+}
+
+/* ---------- consistency heatmap ---------- */
+const heat = document.getElementById('heat');
+const maxMin = Math.max(1, ...D.days.map(d=>d.minutes));
+for(const d of D.days){
+  const i = d.minutes ? Math.min(4, Math.floor(d.minutes/maxMin*4.999)) : -1;
+  const sq = el('i',{'data-tip': d.minutes
+      ? `<b>${d.date}</b><br>${d.minutes} min · ${d.sets} sets${d.titles?'<br>'+d.titles:''}`
+      : `<b>${d.date}</b><br>rest`});
+  if(i>=0) sq.style.background = css(RAMP[i]);
+  heat.append(sq);
+}
+
+/* ---------- small-multiple line charts: estimated 1RM ---------- */
+const W=320,H=132,P={t:8,r:10,b:20,l:34};
+for(const s of D.e1rm){
+  if(s.points.length<2) continue;
+  const xs=s.points.map(p=>p.t), ys=s.points.map(p=>p.v);
+  const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys)*0.94,y1=Math.max(...ys)*1.04;
+  const X=t=>P.l+(t-x0)/((x1-x0)||1)*(W-P.l-P.r);
+  const Y=v=>H-P.b-(v-y0)/((y1-y0)||1)*(H-P.t-P.b);
+  const d = s.points.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+' '+Y(p.v).toFixed(1)).join(' ');
+  const ns='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(ns,'svg'); svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  const add=(n,at)=>{const e=document.createElementNS(ns,n);
+    for(const[k,v] of Object.entries(at))e.setAttribute(k,v);svg.append(e);return e};
+  for(const v of [y0,(y0+y1)/2,y1]){
+    add('line',{class:'gl',x1:P.l,x2:W-P.r,y1:Y(v),y2:Y(v)});
+    const tx=add('text',{class:'ax',x:P.l-6,y:Y(v)+3,'text-anchor':'end'}); tx.textContent=Math.round(v);
+  }
+  add('path',{d,fill:'none',stroke:css('--accent'),'stroke-width':2,
+              'stroke-linejoin':'round','stroke-linecap':'round'});
+  for(const p of s.points){
+    const c=add('circle',{cx:X(p.t),cy:Y(p.v),r:4.5,fill:css('--accent'),
+      stroke:css('--surface-2'),'stroke-width':2});
+    c.setAttribute('data-tip',`<b>${p.v} kg</b> est. 1RM<br>${p.date}<br>${p.from}`);
+  }
+  const first=add('text',{class:'ax',x:P.l,y:H-6}); first.textContent=s.points[0].date.slice(0,7);
+  const last=add('text',{class:'ax',x:W-P.r,y:H-6,'text-anchor':'end'});
+  last.textContent=s.points[s.points.length-1].date.slice(0,7);
+  document.getElementById('e1rm').append(
+    el('div',{class:'panel'},[el('h3',{},[s.exercise]),
+      el('div',{class:'sub'},[s.sub]), svg]));
+}
+
+/* ---------- horizontal bars: sets per muscle ---------- */
+(function(){
+  const rows=D.muscle, bw=760, lw=112, rowH=26, gap=2;
+  const max=Math.max(...rows.map(r=>r.sets));
+  const ns='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(ns,'svg');
+  svg.setAttribute('viewBox',`0 0 ${bw} ${rows.length*(rowH+gap)}`);
+  rows.forEach((r,i)=>{
+    const y=i*(rowH+gap), w=Math.max(2,r.sets/max*(bw-lw-108));
+    const step=RAMP[Math.min(4,Math.floor(r.sets/max*4.999))];
+    const g=document.createElementNS(ns,'g'); g.setAttribute('data-tip',r.tip);
+    const mk=(n,at,txt)=>{const e=document.createElementNS(ns,n);
+      for(const[k,v] of Object.entries(at))e.setAttribute(k,v);
+      if(txt!=null)e.textContent=txt; g.append(e); return e};
+    mk('rect',{x:0,y,width:bw,height:rowH,fill:'transparent'});
+    mk('text',{x:0,y:y+rowH/2+4},r.muscle);
+    mk('rect',{x:lw,y:y+5,width:w,height:rowH-10,rx:4,fill:css(step)});
+    mk('text',{class:'val',x:lw+w+8,y:y+rowH/2+4},r.sets);
+    if(r.flag) mk('text',{class:'flag',x:lw+w+8+String(r.sets).length*9+10,y:y+rowH/2+4},r.flag);
+    svg.append(g);
+  });
+  document.getElementById('muscle').append(svg);
+  document.getElementById('muscleNote').textContent=D.muscleNote;
+})();
+
+/* ---------- PR table ---------- */
+(function(){
+  const t=document.getElementById('prs');
+  t.append(el('thead',{},[el('tr',{},[
+    el('th',{},['Lift']),el('th',{},['Best set']),el('th',{},['Est. 1RM']),el('th',{},['When'])])]));
+  const tb=el('tbody');
+  for(const p of D.prs) tb.append(el('tr',{'data-tip':p.tip},[
+    el('td',{},[p.exercise]),el('td',{class:'n'},[p.set]),
+    el('td',{class:'n'},[p.e1rm+' kg']),el('td',{class:'n'},[p.date])]));
+  t.append(tb);
+})();
+
+document.getElementById('stamp').textContent =
+  `${D.workoutCount} workouts logged ${D.span}. Built ${D.built} from your Hevy log. Every number here comes from a logged set.`;
+</script>
+</body>
+</html>
