@@ -153,11 +153,11 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "api-key: $HEVY_API_KEY" \
 Cache the whole exercise catalog (needed before any routine write):
 
 ```bash
-page=1; : > ~/.kg-trainer/exercise-templates.jsonl
+page=1; : > kg-trainer-data/exercise-templates.jsonl
 while :; do
   r=$(curl -s -H "api-key: $HEVY_API_KEY" \
     "https://api.hevyapp.com/v1/exercise_templates?page=$page&pageSize=100")
-  echo "$r" | jq -c '.exercise_templates[]' >> ~/.kg-trainer/exercise-templates.jsonl
+  echo "$r" | jq -c '.exercise_templates[]' >> kg-trainer-data/exercise-templates.jsonl
   [ "$page" -ge "$(echo "$r" | jq '.page_count')" ] && break
   page=$((page+1))
 done
@@ -167,7 +167,7 @@ Then resolve a name to an id:
 
 ```bash
 jq -r 'select(.title|test("Bench Press";"i"))|[.id,.title,.equipment]|@tsv' \
-  ~/.kg-trainer/exercise-templates.jsonl
+  kg-trainer-data/exercise-templates.jsonl
 ```
 
 Pull recent workouts (remember the cap of 10 per page):

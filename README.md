@@ -56,9 +56,11 @@ export HEVY_API_KEY=your-key-here
 
 To persist it across sessions instead, write it to a file the scripts read automatically:
 
+Run this from your project directory — the one you open Claude Code in:
+
 ```bash
-mkdir -p ~/.kg-trainer && printf '%s' 'your-key-here' > ~/.kg-trainer/hevy-key
-chmod 600 ~/.kg-trainer/hevy-key
+mkdir -p kg-trainer-data && printf '%s' 'your-key-here' > kg-trainer-data/hevy-key
+chmod 600 kg-trainer-data/hevy-key
 ```
 
 `$HEVY_API_KEY` wins if both are present. The scripts never echo the key, and it never reaches a
@@ -66,9 +68,14 @@ plan file, the dashboard, or any external service.
 
 ### 4. Confirm it works
 
+From your project directory:
+
 ```bash
-scripts/hevy.py ping
+~/.claude/skills/kg-trainer/scripts/hevy.py ping
 ```
+
+Run the scripts from your project, not from this repo: they refuse to keep personal data inside the
+skill's own directory.
 
 A JSON object with your Hevy display name means you are set. `401` means a bad key; `403` usually
 means the account has no Pro subscription.
@@ -81,9 +88,9 @@ Just tell Claude what you want — "build me a training program" — and the ski
 the data steps yourself first:
 
 ```bash
-scripts/hevy.py catalog          # cache the ~490-exercise catalog (needed before any push)
-scripts/analyze.py pull --full   # cache every logged workout and body measurement
-scripts/analyze.py report        # the baseline tables
+~/.claude/skills/kg-trainer/scripts/hevy.py catalog          # cache the ~490-exercise catalog (needed before any push)
+~/.claude/skills/kg-trainer/scripts/analyze.py pull --full   # cache every logged workout and body measurement
+~/.claude/skills/kg-trainer/scripts/analyze.py report        # the baseline tables
 ```
 
 The full pull is slow by design: Hevy caps `pageSize` at 10, so it is one request per 10 workouts
@@ -94,12 +101,12 @@ The full pull is slow by design: Hevy caps `pageSize` at 10, so it is one reques
 
 | Step | What happens | Ends with |
 |---|---|---|
-| 1 | Pulls your Hevy history and computes frequency, best sets, estimated 1RM trend, muscle balance, RPE | Tables on screen, cache in `~/.kg-trainer/data/` |
+| 1 | Pulls your Hevy history and computes frequency, best sets, estimated 1RM trend, muscle balance, RPE | Tables on screen, cache in `kg-trainer-data/data/` |
 | 2 | Interviews you one short group of questions at a time, skipping whatever the data already answered | `profile.json` written |
 | 3 | Tells you what your data actually says, including where it disagrees with you | **Stops and waits for you** |
 | 4 | Designs a 6–12 week block, one routine per session, loads derived from your own estimated 1RMs | **Stops and waits for your approval** |
 | 5 | Maps every exercise to a real Hevy template id, creates the folder, pushes each routine | Real routine ids reported back |
-| 6 | Generates the dashboard | `~/.kg-trainer/dashboard/index.html` |
+| 6 | Generates the dashboard | `kg-trainer-data/dashboard/index.html` |
 | 7 | Ongoing coaching via keywords | A check-in record per week |
 
 Steps 3 and 4 stop on purpose. The plan you get is meant to survive your objections first.
@@ -122,8 +129,8 @@ Say any of these to Claude:
 ### The weekly check-in
 
 ```bash
-scripts/checkin.py import-hevy                  # or: log-weight 2026-09-18 81.7
-scripts/checkin.py trend --calories 2650
+~/.claude/skills/kg-trainer/scripts/checkin.py import-hevy   # or: log-weight 2026-09-18 81.7
+~/.claude/skills/kg-trainer/scripts/checkin.py trend --calories 2650
 ```
 
 `trend` returns a `verdict` you should read before changing anything:
@@ -182,7 +189,7 @@ history [--last N]                 past check-ins
 build [--name NAME] [--goal TEXT] [--open] [--no-images]
 ```
 
-Writes `~/.kg-trainer/dashboard/`. Opens straight from the filesystem — no server, and no API key
+Writes `kg-trainer-data/dashboard/`. Opens straight from the filesystem — no server, and no API key
 in the output. Sections: hero lift, stat tiles, plan tabs with exercise photos, a 52-week
 consistency heatmap, estimated-1RM small multiples, sets per muscle, and personal records. Every
 mark has a hover tooltip with the exact numbers.
@@ -196,8 +203,12 @@ script prints the match rate so you can see how many.
 
 ## Where your data lives
 
+One `kg-trainer-data/` per project, at the project root: the scripts walk up from wherever they
+are run to the nearest existing `kg-trainer-data/` or git root, so running from a subdirectory
+reuses the same store. `scripts/paths.py` prints which one is in use.
+
 ```
-~/.kg-trainer/
+kg-trainer-data/
   profile.json               your intake answers and current targets
   hevy-key                   optional, chmod 600
   exercise-templates.jsonl   cached Hevy catalog
@@ -208,7 +219,7 @@ script prints the match rate so you can see how many.
   dashboard/                 generated board
 ```
 
-Set `$KG_TRAINER_HOME` to move all of it, which is also how you keep a test profile separate from
+Set `$KG_TRAINER_HOME` to pin all of it to one place across projects, which is also how you keep a test profile separate from
 your real one.
 
 `data/` is a rebuildable cache. `profile.json`, `weight-log.csv`, `checkins.jsonl` and `plans/` are
@@ -278,7 +289,7 @@ OpenAPI spec is wrong about several of them.
 
 ## Privacy
 
-Your training history, bodyweight and plans stay in `~/.kg-trainer/` on your machine. The Hevy API
+Your training history, bodyweight and plans stay in `kg-trainer-data/` at the root of the project you run the skill from. If that project is a git repo, add `kg-trainer-data/` to its `.gitignore` — the scripts warn until you do. The Hevy API
 key is read from the environment or a `chmod 600` file, is never printed, and never leaves your
 machine except in the `api-key` header to `api.hevyapp.com`. The generated dashboard contains no
 key and makes no API calls — it reads a local `data.js`. The only other outbound request is to a
@@ -297,6 +308,7 @@ references/hevy-api.md           endpoint map, request bodies, verified quirks
 references/hevy-openapi.json     the extracted OpenAPI spec
 references/programming.md        volume landmarks, discipline templates, TDEE math
 references/state.md              state layout and profile.json schema
+scripts/paths.py                 resolves the kg-trainer-data/ store
 scripts/hevy.py                  API client
 scripts/analyze.py               history cache and baseline analysis
 scripts/checkin.py               weight trend and check-in log

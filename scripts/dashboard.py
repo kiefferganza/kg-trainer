@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate a static training dashboard from the cached Hevy log.
 
-Writes ~/.kg-trainer/dashboard/{index.html,data.js,img/*}. It opens straight
+Writes kg-trainer-data/dashboard/{index.html,data.js,img/*}. It opens straight
 from the filesystem — no server, and no API key ever reaches the output.
 
 Exercise photos come from the public-domain free-exercise-db. Each exercise has
@@ -17,7 +17,6 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
-import os
 import pathlib
 import re
 import subprocess
@@ -27,8 +26,9 @@ import urllib.request
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import analyze  # noqa: E402
 import hevy  # noqa: E402
+import paths  # noqa: E402
 
-STATE = pathlib.Path(os.environ.get("KG_TRAINER_HOME", os.path.expanduser("~/.kg-trainer")))
+STATE = paths.state_dir()
 OUT = STATE / "dashboard"
 IMG = OUT / "img"
 TEMPLATE = pathlib.Path(__file__).parent / "dashboard_template.html"

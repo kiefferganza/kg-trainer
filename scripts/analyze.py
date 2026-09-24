@@ -4,11 +4,11 @@
 Caches the full log locally, then computes the numbers a coach needs. Every
 figure here comes from logged sets — nothing is estimated or remembered.
 
-State (override root with $KG_TRAINER_HOME):
-  ~/.kg-trainer/data/workouts.jsonl      every logged workout
-  ~/.kg-trainer/data/measurements.json   body measurements
-  ~/.kg-trainer/data/sync.json           {"last_pull": ISO} for incremental updates
-  ~/.kg-trainer/exercise-templates.jsonl the catalog (hevy.py catalog)
+State (store root resolved by paths.py):
+  kg-trainer-data/data/workouts.jsonl      every logged workout
+  kg-trainer-data/data/measurements.json   body measurements
+  kg-trainer-data/data/sync.json           {"last_pull": ISO} for incremental updates
+  kg-trainer-data/exercise-templates.jsonl the catalog (hevy.py catalog)
 
 Usage:
   analyze.py pull [--full]        # incremental by default; --full re-reads everything
@@ -21,15 +21,15 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
-import os
 import pathlib
 import statistics
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import hevy  # noqa: E402  — reuse the one API client
+import paths  # noqa: E402
 
-STATE = pathlib.Path(os.environ.get("KG_TRAINER_HOME", os.path.expanduser("~/.kg-trainer")))
+STATE = paths.state_dir()
 DATA = STATE / "data"
 WORKOUTS = DATA / "workouts.jsonl"
 MEASUREMENTS = DATA / "measurements.json"

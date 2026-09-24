@@ -12,7 +12,7 @@ An AI personal trainer built on the user's own logged data. Seven steps, three o
 1. **Never invent a number.** Every figure comes from a logged set, a script, or the user's own mouth. If it came from memory or estimation, label it as such in the same sentence.
 2. **Every step ends by writing state to disk.** A coaching loop with no persistence is a cold start every week.
 
-Read references/hevy-api.md before any API call and references/state.md for the file layout. Scripts live in `scripts/`; run them rather than reimplementing their math.
+Read references/hevy-api.md before any API call and references/state.md for the file layout. Scripts live in `scripts/`; run them rather than reimplementing their math. Call them by their full path from the user's project directory — never `cd` into the skill directory, because the scripts refuse to keep personal data inside the skill.
 
 ## Where you are
 
@@ -43,7 +43,7 @@ digraph steps {
 }
 ```
 
-Open every session by checking `~/.kg-trainer/` and saying which step you are on.
+Open every session by running `scripts/paths.py`, which prints the resolved `kg-trainer-data/` store, then check it and say which step you are on. The store sits at the root of the project (the nearest existing `kg-trainer-data/` or git root walking up from the working directory), so subdirectories share it. It is per-project, not per-machine — if it is empty but the user expects history, ask where they ran the skill before rather than starting a fresh intake. `$KG_TRAINER_HOME` pins one store across projects. If `paths.py` warns that the store is not gitignored, add `kg-trainer-data/` to that repo's `.gitignore` before writing anything.
 
 ## STEP 1 — Pull the baseline
 
@@ -78,7 +78,7 @@ Ask **one short group at a time and wait.** Skip anything STEP 1 already answere
 
 Also ask for **sex** if it is not known — it is a term in the BMR equation. Ask; never infer it from a name.
 
-Write `~/.kg-trainer/profile.json` when the answers are in (references/state.md has the schema). **STEP 2 is not finished until that file exists.**
+Write `kg-trainer-data/profile.json` when the answers are in (references/state.md has the schema). **STEP 2 is not finished until that file exists.**
 
 ## STEP 3 — Tell the truth, then stop
 
@@ -104,7 +104,7 @@ A block of 6–12 weeks, sized to the goal date if there is one. Read references
 - Every exercise must fit their equipment and avoid what aggravates their injuries.
 - Progression rule in plain English: when to add weight, when to hold, when to back off.
 
-Show the whole plan as one table per routine. Write it to `~/.kg-trainer/plans/meso-NN.md`. **Stop and wait for approval.** Make the changes they ask for, show it again, and wait again.
+Show the whole plan as one table per routine. Write it to `kg-trainer-data/plans/meso-NN.md`. **Stop and wait for approval.** Make the changes they ask for, show it again, and wait again.
 
 ## STEP 5 — Send it to Hevy
 
@@ -113,7 +113,7 @@ Only after approval.
 1. **Map every exercise to a template.** `scripts/hevy.py find "<pattern>"`. Show a table of plan exercise → Hevy title → template id. No good match means say so and propose a custom exercise.
 2. **Create anything missing** with `POST /v1/exercise_templates` (enums in references/hevy-api.md). A 403 means the custom-exercise limit is hit — tell them and swap for the closest catalog exercise.
 3. **Create the folder:** `scripts/hevy.py new-folder "<plan name>"`, keep `.routine_folder.id`.
-4. **Create each routine:** write one JSON file per session to `~/.kg-trainer/plans/meso-NN-routines/`, then `scripts/hevy.py push-routine <file>`. Use `rep_range` for ranges. Put RIR/RPE targets and cues in the **exercise** `notes` — routine sets have no `rpe` field, and a routine's own `notes` is silently discarded by the API. A 403 means the routine limit is hit; stop and say so.
+4. **Create each routine:** write one JSON file per session to `kg-trainer-data/plans/meso-NN-routines/`, then `scripts/hevy.py push-routine <file>`. Use `rep_range` for ranges. Put RIR/RPE targets and cues in the **exercise** `notes` — routine sets have no `rpe` field, and a routine's own `notes` is silently discarded by the API. A 403 means the routine limit is hit; stop and say so.
 5. **Verify:** `scripts/hevy.py routines` and confirm each routine exists with the right exercise count. Report the real ids. Then: "Open Hevy → Workout, and the folder is there."
 
 Never claim a push succeeded without an id to show for it. `push-routine` exits non-zero on failure and refuses any `exercise_template_id` that is not in the cached catalog.
@@ -124,7 +124,7 @@ Never claim a push succeeded without an id to show for it. `push-routine` exits 
 scripts/dashboard.py build --name "<name>" --goal "<goal>" --open
 ```
 
-Writes `~/.kg-trainer/dashboard/{index.html,data.js,img/}` — opens from the filesystem, no server, no API key in the output. Dark board, one accent hue, big condensed numbers; exercise photos come from the public-domain free-exercise-db and crossfade start/finish frames, with a text tile wherever no confident match exists. Sections: hero, stat tiles, plan tabs, consistency heatmap, estimated 1RM small multiples, sets per muscle, personal records — every mark has a hover tooltip with exact numbers.
+Writes `kg-trainer-data/dashboard/{index.html,data.js,img/}` — opens from the filesystem, no server, no API key in the output. Dark board, one accent hue, big condensed numbers; exercise photos come from the public-domain free-exercise-db and crossfade start/finish frames, with a text tile wherever no confident match exists. Sections: hero, stat tiles, plan tabs, consistency heatmap, estimated 1RM small multiples, sets per muscle, personal records — every mark has a hover tooltip with exact numbers.
 
 The colour ramp is one hue and runs **dark → light as values rise**, because the board is dark and the darkest step is the one that recedes into the surface. Report the photo match rate the script prints; if it is poor, the fix is better exercise titles, not a wrong photo.
 

@@ -1,9 +1,17 @@
 # Local state layout
 
-Everything lives under `~/.kg-trainer/` (override with `$KG_TRAINER_HOME`). It sits outside the skill directory so it survives reinstalls and never lands in a git repo.
+Everything lives under one `kg-trainer-data/` directory, resolved once by `scripts/paths.py` (run it on its own to print the answer):
+
+1. `$KG_TRAINER_HOME`, if set (absolute or `~`-relative).
+2. Otherwise walk up from the working directory and stop at the first directory that either already contains `kg-trainer-data/` or is a git root; the store is `kg-trainer-data/` there.
+3. Otherwise `kg-trainer-data/` in the working directory.
+
+So the store follows the project, not the machine, and running from a subdirectory reuses the project's store instead of starting an empty one. The scripts exit rather than resolve to a store inside the skill's own directory — only an explicit `$KG_TRAINER_HOME` can put it there.
+
+Inside a git repo the store must be ignored: it holds bodyweight history, plans and possibly the `hevy-key` file. The scripts print a warning on stderr when it is not; add `kg-trainer-data/` to that repo's `.gitignore` before writing anything.
 
 ```
-~/.kg-trainer/
+kg-trainer-data/
   profile.json               intake answers + current targets
   hevy-key                   optional, chmod 600 — only if the user asks to save it
   exercise-templates.jsonl   cached Hevy catalog (scripts/hevy.py catalog)
@@ -73,4 +81,4 @@ Append only. Never rewrite a past record — a wrong past decision is data about
 
 ## API key handling
 
-Read the key from `$HEVY_API_KEY` first. Only write `~/.kg-trainer/hevy-key` if the user explicitly asks to save it, and then `chmod 600` it immediately. Never echo the key back, never paste it into a plan file, a markdown document, a commit, or an external app. When a key fails, report the HTTP status, not the key.
+Read the key from `$HEVY_API_KEY` first. Only write `kg-trainer-data/hevy-key` if the user explicitly asks to save it, and then `chmod 600` it immediately and confirm `kg-trainer-data/` is gitignored — the store now sits inside the working directory, so an unignored key file is one `git add .` away from a commit. Never echo the key back, never paste it into a plan file, a markdown document, a commit, or an external app. When a key fails, report the HTTP status, not the key.

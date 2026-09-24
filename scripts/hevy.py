@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Thin CLI over the Hevy public API. No dependencies beyond the stdlib.
 
-The API key is read from $HEVY_API_KEY, or from ~/.kg-trainer/hevy-key if that
+The API key is read from $HEVY_API_KEY, or from kg-trainer-data/hevy-key if that
 file exists. The key is never echoed.
 
 Usage:
@@ -31,8 +31,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import paths
+
 BASE = "https://api.hevyapp.com"
-STATE = pathlib.Path(os.environ.get("KG_TRAINER_HOME", os.path.expanduser("~/.kg-trainer")))
+STATE = paths.state_dir()
 CATALOG = STATE / "exercise-templates.jsonl"
 
 
@@ -43,7 +45,7 @@ def api_key() -> str:
         if keyfile.exists():
             key = keyfile.read_text().strip()
     if not key:
-        sys.exit("No API key. Set HEVY_API_KEY or write it to ~/.kg-trainer/hevy-key")
+        sys.exit("No API key. Set HEVY_API_KEY or write it to kg-trainer-data/hevy-key")
     return key
 
 

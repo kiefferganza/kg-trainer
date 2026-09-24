@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Weight-trend math and check-in persistence for kg-trainer.
 
-State lives in ~/.kg-trainer (override with $KG_TRAINER_HOME):
+State lives in kg-trainer-data (store root resolved by paths.py):
   profile.json        the intake answers
   weight-log.csv      date,weight_kg  (one row per weigh-in)
   checkins.jsonl      one record per weekly check-in, append only
@@ -23,13 +23,14 @@ import argparse
 import csv
 import datetime as dt
 import json
-import os
 import pathlib
 import statistics
 import subprocess
 import sys
 
-HOME = pathlib.Path(os.environ.get("KG_TRAINER_HOME", os.path.expanduser("~/.kg-trainer")))
+import paths
+
+HOME = paths.state_dir()
 PROFILE = HOME / "profile.json"
 WEIGHTS = HOME / "weight-log.csv"
 CHECKINS = HOME / "checkins.jsonl"
