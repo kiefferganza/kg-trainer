@@ -2,6 +2,7 @@ import argparse
 import email.message
 import io
 import json
+import pathlib
 import threading
 import urllib.error
 import urllib.request
@@ -394,3 +395,85 @@ def test_call_encodes_query_params(monkeypatch):
     liftosaur.call("GET", "/history", params={"limit": 200, "startDate": "2026-09-01"})
     assert "limit=200" in captured["url"]
     assert "startDate=2026-09-01" in captured["url"]
+
+
+# --- .env key resolution ---------------------------------------------------
+
+def test_dotenv_supplies_the_key_when_nothing_is_exported(monkeypatch, tmp_path):
+    monkeypatch.delenv("LIFTOSAUR_API_KEY", raising=False)
+    (tmp_path / ".env").write_text("LIFTOSAUR_API_KEY=lftsk_fromdotenv\n")
+    monkeypatch.chdir(tmp_path)
+    assert liftosaur.api_key() == "lftsk_fromdotenv"
+
+
+def test_exported_key_wins_over_dotenv(monkeypatch, tmp_path):
+    monkeypatch.setenv("LIFTOSAUR_API_KEY", "lftsk_exported")
+    (tmp_path / ".env").write_text("LIFTOSAUR_API_KEY=lftsk_fromdotenv\n")
+    monkeypatch.chdir(tmp_path)
+    assert liftosaur.api_key() == "lftsk_exported"
+
+
+def test_dotenv_is_found_from_a_nested_directory(monkeypatch, tmp_path):
+    monkeypatch.delenv("LIFTOSAUR_API_KEY", raising=False)
+    (tmp_path / ".env").write_text("LIFTOSAUR_API_KEY=lftsk_atroot\n")
+    nested = tmp_path / "a" / "b" / "c"
+    nested.mkdir(parents=True)
+    monkeypatch.chdir(nested)
+    assert liftosaur.api_key() == "lftsk_atroot"
+
+
+def test_walk_continues_past_a_dotenv_that_lacks_the_key(monkeypatch, tmp_path):
+    monkeypatch.delenv("LIFTOSAUR_API_KEY", raising=False)
+    (tmp_path / ".env").write_text("LIFTOSAUR_API_KEY=lftsk_atroot\n")
+    nested = tmp_path / "child"
+    nested.mkdir()
+    (nested / ".env").write_text("# no key here\nSOMETHING_ELSE=1\n")
+    monkeypatch.chdir(nested)
+    assert liftosaur.api_key() == "lftsk_atroot"
+
+
+def test_dotenv_parsing_handles_quotes_comments_and_blanks(monkeypatch, tmp_path):
+    monkeypatch.delenv("LIFTOSAUR_API_KEY", raising=False)
+    (tmp_path / ".env").write_text(
+        '\n# a comment\n\n  LIFTOSAUR_API_KEY = "lftsk_quoted"  \nOTHER=x\n')
+    monkeypatch.chdir(tmp_path)
+    assert liftosaur.api_key() == "lftsk_quoted"
+
+
+def test_placeholder_only_dotenv_is_treated_as_no_key(monkeypatch, tmp_path):
+    """An unfilled .env must not be mistaken for a configured key."""
+    monkeypatch.delenv("LIFTOSAUR_API_KEY", raising=False)
+    (tmp_path / ".env").write_text("LIFTOSAUR_API_KEY=\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(liftosaur.paths, "state_dir", lambda: tmp_path / "store")
+    with pytest.raises(SystemExit) as exc:
+        liftosaur.api_key()
+    assert "API Keys" in str(exc.value)
+
+
+def test_a_key_from_dotenv_never_reaches_a_failure_message(monkeypatch, tmp_path):
+    monkeypatch.delenv("LIFTOSAUR_API_KEY", raising=False)
+    (tmp_path / ".env").write_text("LIFTOSAUR_API_KEY=lftsk_dotenvsecret\n")
+    monkeypatch.chdir(tmp_path)
+
+    def boom(req, timeout=None):
+        raise urllib.error.HTTPError(liftosaur.BASE + "/settings", 401, "Unauthorized", {}, None)
+
+    monkeypatch.setattr(liftosaur._OPENER, "open", boom)
+    with pytest.raises(SystemExit) as exc:
+        liftosaur.ok(*liftosaur.call("GET", "/settings"), "GET /settings")
+    message = str(exc.value)
+    assert "401" in message
+    assert "lftsk_dotenvsecret" not in message
+
+
+def test_the_suite_never_sees_a_real_dotenv_up_the_tree():
+    """Guards conftest's cwd isolation.
+
+    api_key() walks parents looking for .env. If a test ever runs with a real
+    checkout above it, the suite reads the developer's live key -- which once
+    broke three key-resolution tests here and should never happen again.
+    """
+    start = pathlib.Path.cwd().resolve()
+    reachable = [d / ".env" for d in (start, *start.parents) if (d / ".env").is_file()]
+    assert reachable == [], f"a real .env is reachable from the test cwd: {reachable}"

@@ -7,3 +7,6 @@ __pycache__/
 *.pyc
 .DS_Store
 .superpowers/
+.env
+.env.*
+!.env.example

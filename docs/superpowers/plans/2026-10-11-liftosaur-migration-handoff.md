@@ -139,7 +139,7 @@ The working ledger lives at `.superpowers/sdd/2026-10-11-liftosaur-migration/pro
 ## Environment notes for whoever resumes
 
 - **venv:** `.venv`, Python 3.11.16, pytest 8.4.2. Run tests as `./.venv/bin/python -m pytest`. Built from `/Users/kiefferganza/.local/bin/python3.11`; the system `python3` is 3.9.6 and must not be used.
-- **`paths.state_dir()` exits inside the skill tree.** `tests/conftest.py` handles this for tests by setting `KG_TRAINER_HOME`. Any script run by hand from this worktree needs `KG_TRAINER_HOME` set, or it will refuse to start.
+- **`paths.state_dir()` exits inside the skill tree.** `tests/conftest.py` handles this for tests by setting `KG_TRAINER_HOME`. Any script run by hand from this worktree needs `KG_TRAINER_HOME` set, or it will refuse to start — `.env` has a commented `KG_TRAINER_HOME=` line for this. Note `liftosaur.py ping` does not need it, because `api_key()` reaches `.env` before it touches `state_dir()`.
 - **Worktree shell guard.** This session is worktree-isolated, and the harness refuses compound shell commands it cannot prove stay inside the worktree. Heredocs mentioning the ignore file by name, `for` loops calling scripts, and `cmd && cmd` chains were all rejected. Run plain, separate commands, and write files with the file tools rather than heredocs.
 - **Task briefs** for Tasks 4–7 were extracted to the git-ignored workspace and are regenerable at any time:
   `bash <SDD_SKILL>/scripts/task-brief docs/superpowers/plans/2026-10-11-liftosaur-migration.md <N>`
@@ -148,8 +148,19 @@ The working ledger lives at `.superpowers/sdd/2026-10-11-liftosaur-migration/pro
 
 ---
 
+## Credentials — done
+
+The API key is configured and **verified live** as of this handoff.
+
+- It lives in `.env` at the project root (`/Users/kiefferganza/Desktop/side/skills/kg-trainer/.env`), mode `600`.
+- `scripts/liftosaur.py ping` succeeds against the real API.
+- **The account reports `units: kg`**, which settles Task 8 Step 1: no unit conversion concerns for this user's own data. Warmup timer 90s, workout 180s.
+- `.env` is excluded from git by `.git/info/exclude` (repo-wide, local, untracked) and by this branch's `.gitignore`. `.env.example` is the tracked template.
+- Resolution order in `api_key()`: exported `$LIFTOSAUR_API_KEY` → nearest `.env` searching cwd then parents → `<kg-trainer-data>/liftosaur-key`. The upward walk is why a `.env` at the project root is found from inside this worktree too.
+
+**Note:** the key value was accidentally echoed into the session transcript during a debug check on 2026-10-11. Rotate it in Settings → API Keys if that transcript is not fully controlled. No committed code prints the key.
+
 ## Still needed from the user
 
-1. **`LIFTOSAUR_API_KEY`** — a premium key (`lftsk_…`), created in the app under Settings → API Keys. Nothing in Tasks 1–7 needs it; Task 8 cannot run without it.
-2. **Confirmation that the Hevy→Liftosaur history import is done.** Task 8 Step 2 expects a workout count near the 334 records that were in Hevy, and will stop rather than report over partial data.
-3. **A decision they may want to make:** whether RPE survived their import. The Hevy baseline was an average top-set RPE of 8.6 across 194 top sets. If the import dropped the `@` annotations, that table goes empty — the report degrades honestly rather than inventing numbers, but it is a real loss and Task 8 Step 4 checks it.
+1. **Confirmation that the Hevy→Liftosaur history import is done.** Task 8 Step 2 expects a workout count near the 334 records that were in Hevy, and will stop rather than report over partial data.
+2. **A decision they may want to make:** whether RPE survived their import. The Hevy baseline was an average top-set RPE of 8.6 across 194 top sets. If the import dropped the `@` annotations, that table goes empty — the report degrades honestly rather than inventing numbers, but it is a real loss and Task 8 Step 4 checks it.

@@ -14,8 +14,9 @@ Usage:
   liftosaur.py program-stats <file>
   liftosaur.py playground <file> [--week N] [--day N]
 
-The key is read from $LIFTOSAUR_API_KEY, else from <state>/liftosaur-key.
-It is never printed, and a failure reports the HTTP status, not the key.
+The key is read from $LIFTOSAUR_API_KEY, else from a .env file in the project
+directory, else from <state>/liftosaur-key. It is never printed, and a failure
+reports the HTTP status, not the key.
 """
 
 from __future__ import annotations
@@ -50,18 +51,60 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 _OPENER = urllib.request.build_opener(_NoRedirect)
 
 
+def _dotenv_value(name: str) -> str | None:
+    """Read one variable from the nearest .env, searching the cwd then its parents.
+
+    Nothing in the standard library reads .env, so this is a deliberately small
+    parser: `KEY=VALUE` lines, optional surrounding quotes, `#` comments and blank
+    lines skipped. The walk continues past a .env that does not define `name`, so
+    running from a nested directory (a git worktree, say) still finds the project
+    root's file. An exported variable always wins over .env -- see api_key().
+    """
+    try:
+        start = pathlib.Path.cwd().resolve()
+    except OSError:
+        return None
+    for directory in (start, *start.parents):
+        env_file = directory / ".env"
+        if not env_file.is_file():
+            continue
+        try:
+            text = env_file.read_text()
+        except OSError:
+            continue
+        for raw in text.splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            if key.strip() != name:
+                continue
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1]
+            value = value.strip()
+            if value:
+                return value
+    return None
+
+
 def api_key() -> str:
     env = os.environ.get("LIFTOSAUR_API_KEY")
     if env and env.strip():
         return env.strip()
+    from_dotenv = _dotenv_value("LIFTOSAUR_API_KEY")
+    if from_dotenv:
+        return from_dotenv
     key_file = paths.state_dir() / "liftosaur-key"
     if key_file.exists():
         value = key_file.read_text().strip()
         if value:
             return value
-    sys.exit("No Liftosaur API key. Set $LIFTOSAUR_API_KEY, or save it to "
-             f"{key_file} and chmod 600 it. Create one in the Liftosaur app "
-             "under Settings -> API Keys. A premium subscription is required.")
+    sys.exit("No Liftosaur API key. Set $LIFTOSAUR_API_KEY, or put "
+             "LIFTOSAUR_API_KEY=lftsk_... in a .env file in the project directory "
+             f"(keep it out of git), or save the key to {key_file} and chmod 600 it. "
+             "Create one in the Liftosaur app under Settings -> API Keys. "
+             "A premium subscription is required.")
 
 
 def call(method: str, path: str, params: dict | None = None, body: dict | None = None):
