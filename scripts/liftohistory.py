@@ -9,6 +9,8 @@ Keeping it an adapter is deliberate: the analysis math stays untouched.
 
 from __future__ import annotations
 
+import re
+
 LB_TO_KG = 0.45359237
 
 _HEADER_KEYS = {
@@ -22,22 +24,46 @@ _HEADER_KEYS = {
 
 def parse_liftohistory(text: str) -> list[dict]:
     """Every workout record in `text`, in the order it appears."""
-    return [_record(block) for block in _blocks(text)]
+    records = (_record(block) for block in _blocks(text))
+    return [r for r in records if r is not None]
+
+
+_HEADER_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T")
+_EMPTY_BODY_RE = re.compile(r"exercises:\s*\{\s*\}\s*$")
 
 
 def _blocks(text: str) -> list[list[str]]:
-    """Group lines into records. A record ends at a closing brace on its own line."""
+    """Group lines into records.
+
+    A record ends at a closing brace on its own line, at a header whose body
+    is an empty `exercises: {}`, or where the next record's header begins. An
+    unterminated record (a truncated page) must never absorb the next one.
+    """
     blocks: list[list[str]] = []
     current: list[str] = []
+    has_header = False
     for raw in text.splitlines():
         line = raw.strip()
         if not line:
+            continue
+        if _HEADER_RE.match(line):
+            if has_header:
+                blocks.append(current)
+                current = []
+            current.append(line)
+            if _EMPTY_BODY_RE.search(line):
+                blocks.append(current)
+                current = []
+                has_header = False
+            else:
+                has_header = True
             continue
         current.append(line)
         if line == "}":
             blocks.append(current)
             current = []
-    if current:  # unterminated final record -- take what is there
+            has_header = False
+    if current:
         blocks.append(current)
     return blocks
 
@@ -64,13 +90,15 @@ def _split_sections(s: str) -> list[str]:
     return [part.strip() for part in out if part.strip()]
 
 
-def _record(lines: list[str]) -> dict:
+def _record(lines: list[str]) -> dict | None:
     notes: list[str] = []
     i = 0
     while i < len(lines) and lines[i].startswith("//"):
         notes.append(lines[i][2:].strip())
         i += 1
 
+    if i >= len(lines) or lines[i] == "}":  # only comments: no record here
+        return None
     record = _header(lines[i])
     record["note"] = " ".join(notes) or None
     i += 1
@@ -137,13 +165,26 @@ def _sets(text: str, kind: str) -> list[dict]:
     return out
 
 
+def _is_scheme(token: str) -> bool:
+    return ("x" in token and not token.startswith("@")
+            and not token.endswith(("lb", "kg")))
+
+
 def _group(group: str, kind: str) -> list[dict]:
-    """Expand one set group. '3x8 185lb @7' is three sets, not one."""
+    """Expand one set group. '3x8 185lb @7' is three sets, not one.
+
+    A group that cannot be read faithfully yields no sets rather than a
+    guessed one: a malformed or zero count, an unreadable rep scheme, a weight
+    with no unit, or nothing recognisable at all.
+    """
     tokens = group.split()
-    count, reps, reps_left, amrap = _scheme(tokens[0]) if tokens else (1, None, None, False)
+    count, reps, reps_left, amrap = 1, None, None, False
+    if tokens and _is_scheme(tokens[0]):
+        count, reps, reps_left, amrap = _scheme(tokens[0])
+        tokens = tokens[1:]
     weight_kg = rpe = duration = None
     rpe_logged = False
-    for token in tokens[1:]:
+    for token in tokens:
         if token.startswith("@"):
             value = token[1:]
             rpe_logged = value.endswith("+")
@@ -152,15 +193,21 @@ def _group(group: str, kind: str) -> list[dict]:
             weight_kg = _weight(token)
         elif token.endswith("s") or "s|" in token:
             duration = token
+        elif _number(token) is not None:  # a bare number: unit unknown
+            return []
+    if reps is None and weight_kg is None and duration is None:
+        return []
     return [{"type": kind, "reps": reps, "reps_left": reps_left, "amrap": amrap,
              "weight_kg": weight_kg, "rpe": rpe, "rpe_logged": rpe_logged,
              "duration": duration} for _ in range(count)]
 
 
 def _scheme(token: str) -> tuple[int, int | None, int | None, bool]:
-    """'3x8' -> (3, 8, None, False).  '3x8|7' -> (3, 8, 7, False).  '1x5+' -> (1, 5, None, True)."""
-    if "x" not in token:
-        return 1, None, None, False
+    """'3x8' -> (3, 8, None, False).  '3x8|7' -> (3, 8, 7, False).  '1x5+' -> (1, 5, None, True).
+
+    An unreadable scheme (non-numeric or zero count, no rep count) returns a
+    count of 0, which expands to no sets.
+    """
     count_s, reps_s = token.split("x", 1)
     amrap = reps_s.endswith("+")
     reps_s = reps_s.rstrip("+")
@@ -170,7 +217,10 @@ def _scheme(token: str) -> tuple[int, int | None, int | None, bool]:
         reps_left = _int(left_s)
     if "-" in reps_s:  # a rep range belongs to a target; take its low end
         reps_s = reps_s.split("-", 1)[0]
-    return (_int(count_s) or 1), _int(reps_s), reps_left, amrap
+    count, reps = _int(count_s), _int(reps_s)
+    if not count or count < 0 or reps is None:
+        return 0, None, None, False
+    return count, reps, reps_left, amrap
 
 
 def _weight(token: str) -> float | None:

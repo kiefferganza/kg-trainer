@@ -115,3 +115,66 @@ def test_multiple_records_separated_by_blank_lines():
 def test_empty_text_yields_no_records():
     assert parse_liftohistory("") == []
     assert parse_liftohistory("\n\n  \n") == []
+
+
+def _sets_of(body):
+    text = '2026-03-01T08:00:00Z / exercises: {\n  Squat / ' + body + '\n}\n'
+    return parse_liftohistory(text)[0]["exercises"][0]["sets"]
+
+
+def test_unterminated_record_does_not_absorb_the_next_one():
+    text = ('2026-03-01T08:00:00Z / exercises: {\n'
+            '  Squat / 3x5 100kg\n'
+            '2026-03-02T08:00:00Z / exercises: {\n'
+            '  Deadlift / 1x5 150kg\n'
+            '}\n')
+    records = parse_liftohistory(text)
+    assert len(records) == 2
+    assert [e["title"] for e in records[0]["exercises"]] == ["Squat"]
+    assert records[1]["start_time"] == "2026-03-02T08:00:00Z"
+    assert [e["title"] for e in records[1]["exercises"]] == ["Deadlift"]
+
+
+def test_one_line_empty_exercises_record_is_closed():
+    text = ('2026-03-01T08:00:00Z / exercises: {}\n'
+            '2026-03-02T08:00:00Z / exercises: {\n'
+            '  Deadlift / 1x5 150kg\n'
+            '}\n')
+    records = parse_liftohistory(text)
+    assert len(records) == 2
+    assert records[0]["exercises"] == []
+    assert len(records[1]["exercises"]) == 1
+
+
+def test_comment_only_block_is_skipped():
+    assert parse_liftohistory("// trailing note\n") == []
+    text = REF + "\n// dangling note\n"
+    assert len(parse_liftohistory(text)) == 1
+
+
+def test_malformed_set_token_yields_no_sets():
+    assert _sets_of("garbage") == []
+
+
+def test_weight_without_unit_is_not_guessed():
+    assert _sets_of("3x5 150") == []
+
+
+def test_pipe_in_unexpected_position_yields_no_sets():
+    assert _sets_of("3x|7 100kg") == []
+    assert _sets_of("|3x5 100kg") == []
+
+
+def test_rep_range_where_set_count_expected_yields_no_sets():
+    assert _sets_of("8-12x3 100kg") == []
+
+
+def test_zero_count_yields_no_sets():
+    assert _sets_of("0x5 100kg") == []
+
+
+def test_group_without_scheme_keeps_its_weight():
+    sets = _sets_of("185lb @8")
+    assert len(sets) == 1
+    assert sets[0]["weight_kg"] == pytest.approx(185 * LB_TO_KG, abs=0.01)
+    assert sets[0]["rpe"] == 8.0
