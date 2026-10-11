@@ -21,6 +21,7 @@ It is never printed, and a failure reports the HTTP status, not the key.
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
 import pathlib
@@ -34,6 +35,18 @@ import paths  # noqa: E402
 
 BASE = "https://www.liftosaur.com/api/v1"
 EXERCISES = pathlib.Path(__file__).resolve().parent.parent / "references" / "exercises.txt"
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """urllib re-sends the Authorization header on redirects, even to another host.
+    Refuse every redirect instead: the redirect status surfaces as an HTTP error."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+# Process-wide: urllib.request.urlopen uses this opener from here on.
+urllib.request.install_opener(urllib.request.build_opener(_NoRedirect))
 
 
 def api_key() -> str:
@@ -61,18 +74,28 @@ def call(method: str, path: str, params: dict | None = None, body: dict | None =
     req = urllib.request.Request(url, data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=60) as response:
-            return response.status, json.loads(response.read() or b"null")
+            status, raw = response.status, response.read()
     except urllib.error.HTTPError as exc:
         try:
-            return exc.code, json.loads(exc.read() or b"null")
-        except json.JSONDecodeError:
+            status, raw = exc.code, exc.read()
+        except (OSError, http.client.HTTPException):
             return exc.code, None
+    except (urllib.error.URLError, OSError, http.client.HTTPException) as exc:
+        sys.exit(f"{method} {path} failed: network error ({type(exc).__name__})")
+    try:
+        return status, json.loads(raw or b"null")
+    except ValueError as exc:
+        if status >= 400:
+            return status, None
+        sys.exit(f"{method} {path} failed: HTTP {status}, response was not JSON "
+                 f"({type(exc).__name__})")
 
 
 def ok(status: int, payload, what: str):
     """Unwrap {"data": ...}, or exit with the status. Never echoes the key."""
     if status >= 400:
-        error = (payload or {}).get("error") or {}
+        error = payload.get("error") if isinstance(payload, dict) else None
+        error = error if isinstance(error, dict) else {}
         detail = " ".join(str(x) for x in (error.get("code"), error.get("message")) if x)
         hint = ""
         if status == 401:
@@ -80,7 +103,16 @@ def ok(status: int, payload, what: str):
         elif status == 422:
             hint = "  (invalid Liftoscript -- run program-stats or playground to locate it)"
         sys.exit(f"{what} failed: HTTP {status} {detail}{hint}".rstrip())
-    return (payload or {}).get("data")
+    if not isinstance(payload, dict):
+        sys.exit(f"{what} failed: response was not a JSON object")
+    return payload.get("data")
+
+
+def _field(data, name: str, what: str):
+    value = data.get(name) if isinstance(data, dict) else None
+    if value is None:
+        sys.exit(f"{what} failed: response has no '{name}'")
+    return value
 
 
 def paginate(path: str, key: str, params: dict | None = None, limit: int = 200) -> list[dict]:
@@ -88,14 +120,23 @@ def paginate(path: str, key: str, params: dict | None = None, limit: int = 200) 
     query = dict(params or {})
     query["limit"] = limit
     out: list[dict] = []
+    seen_cursors: set[str] = set()
     while True:
-        data = ok(*call("GET", path, params=query), f"GET {path}") or {}
-        out.extend(data.get(key, []))
+        data = ok(*call("GET", path, params=query), f"GET {path}")
+        if not isinstance(data, dict):
+            sys.exit(f"GET {path} failed: response has no data object")
+        records = data.get(key, [])
+        if not isinstance(records, list):
+            sys.exit(f"GET {path} failed: '{key}' is not a list")
+        out.extend(records)
         if not data.get("hasMore"):
             return out
         cursor = data.get("nextCursor")
-        if not cursor:
+        if not cursor or not isinstance(cursor, str):
             return out
+        if cursor in seen_cursors:
+            sys.exit(f"GET {path} failed: server repeated a cursor; stopping instead of looping")
+        seen_cursors.add(cursor)
         query["cursor"] = cursor
 
 
@@ -104,8 +145,9 @@ def paginate(path: str, key: str, params: dict | None = None, limit: int = 200) 
 def cmd_ping(_):
     data = ok(*call("GET", "/settings"), "GET /settings")
     print(json.dumps(data, indent=2))
-    if (data or {}).get("units") not in ("kg", None):
-        print(f"note: the account reports units={data['units']}; "
+    units = data.get("units") if isinstance(data, dict) else None
+    if units not in ("kg", None):
+        print(f"note: the account reports units={units}; "
               "kg-trainer works in kilograms and converts on read.", file=sys.stderr)
 
 
@@ -140,7 +182,8 @@ def cmd_measurements(_):
 
 
 def cmd_measurement(a):
-    data = paginate(f"/measurements/{a.key}", "values")
+    key = urllib.parse.quote(a.key, safe="")
+    data = paginate(f"/measurements/{key}", "values")
     print(json.dumps(data, indent=2))
 
 
@@ -149,27 +192,33 @@ def cmd_programs(_):
 
 
 def cmd_program_get(a):
-    data = ok(*call("GET", f"/programs/{a.id}"), f"GET /programs/{a.id}")
+    pid = urllib.parse.quote(a.id, safe="")
+    what = f"GET /programs/{pid}"
+    data = ok(*call("GET", f"/programs/{pid}"), what)
+    text = _field(data, "text", what)
     if a.out:
-        pathlib.Path(a.out).write_text(data["text"])
-        print(f"wrote {a.out}  ({data['name']}, id {data['id']})")
+        pathlib.Path(a.out).write_text(text)
+        print(f"wrote {a.out}  ({data.get('name', '')}, id {data.get('id', a.id)})")
     else:
-        print(data["text"])
+        print(text)
 
 
 def cmd_program_push(a):
     text = pathlib.Path(a.file).read_text()
     if a.id:
+        pid = urllib.parse.quote(a.id, safe="")
         body = {"text": text}
         if a.name:
             body["name"] = a.name
-        data = ok(*call("PUT", f"/programs/{a.id}", body=body), f"PUT /programs/{a.id}")
+        what = f"PUT /programs/{pid}"
+        data = ok(*call("PUT", f"/programs/{pid}", body=body), what)
     else:
         if not a.name:
             sys.exit("--name is required when creating a program.")
-        data = ok(*call("POST", "/programs", body={"name": a.name, "text": text}),
-                  "POST /programs")
-    print(json.dumps({"id": data["id"], "name": data["name"]}, indent=2))
+        what = "POST /programs"
+        data = ok(*call("POST", "/programs", body={"name": a.name, "text": text}), what)
+    print(json.dumps({"id": _field(data, "id", what), "name": _field(data, "name", what)},
+                     indent=2))
 
 
 def cmd_program_stats(a):
