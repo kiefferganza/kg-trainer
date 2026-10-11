@@ -87,12 +87,13 @@ Just tell Claude what you want — "build me a training program" — and the ski
 the data steps yourself first:
 
 ```bash
-~/.claude/skills/kg-trainer/scripts/analyze.py pull --full   # cache every workout and the bodyweight series
+~/.claude/skills/kg-trainer/scripts/analyze.py pull          # cache every workout and the bodyweight series
 ~/.claude/skills/kg-trainer/scripts/analyze.py report        # the baseline tables
 ```
 
-Liftosaur pages 200 records at a time, so even a long history is a handful of requests. After
-the first run, `scripts/analyze.py pull` only asks for workouts since the last one it has.
+Liftosaur pages 200 records at a time, so even a long history is a handful of requests, and
+every pull re-reads the whole history and replaces the cache, so late-logged, edited and deleted
+sessions always come out right.
 
 ### What the seven steps do
 
@@ -116,7 +117,7 @@ Say any of these to Claude:
 
 | Say | What it does |
 |---|---|
-| `UPDATE` | Incremental pull of new workouts, rebuilds the dashboard, lists what changed |
+| `UPDATE` | Re-pulls your history, rebuilds the dashboard, lists what changed |
 | `HOW AM I DOING` | Compares your logged sets against the program's targets; says which lifts are ready to go up |
 | `PROGRESS IT` | Fetches the current program, edits it, checks it, shows before/after, and pushes it back on your yes |
 | `IT HURTS` | Asks where and how bad, then swaps the aggravating exercises and updates the program |
@@ -167,7 +168,7 @@ playground <file> [--week N] [--day N] [--command CMD ...]
 ### `scripts/analyze.py` — history and baseline
 
 ```
-pull [--full]        cache workouts + bodyweight; incremental unless --full
+pull [--full]        re-read every workout + bodyweight and replace the cache (--full: same)
 report [--json]      frequency, best sets, 1RM trend, muscle balance, RPE
 deep-dive <pattern>  one lift, every logged set, ranked by estimated 1RM
 ```
@@ -221,7 +222,7 @@ kg-trainer-data/
   liftosaur-key              optional, chmod 600
   weight-log.csv             date,weight_kg,fat_percent,waist_cm
   checkins.jsonl             append-only, one record per check-in
-  data/                      cached workouts, bodyweight, sync timestamp
+  data/                      cached workouts, bodyweight, last-pull timestamp
   plans/                     the markdown plans and the exact Liftoscript pushed
   dashboard/                 generated board
 ```
@@ -255,9 +256,6 @@ exercises, usually custom ones, have no row in `references/exercise-muscles.json
 cannot be attributed to a muscle and the table undercounts whatever they train. Map them in
 `kg-trainer-data/exercise-muscles.json`, e.g. `{"bayesian curl": "biceps"}`, using one of the
 muscle names the report already shows; it is layered over the built-in map.
-
-**An edited or deleted workout still shows** — an incremental `pull` only asks for new workouts.
-Run `pull --full` to re-read everything.
 
 **A dashboard exercise shows a text tile instead of a photo** — no confident match in the photo
 database. The fix is a more standard exercise name, not a nearly-right photo.

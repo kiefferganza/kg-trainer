@@ -12,9 +12,9 @@
 | Check | Result | Against the Hevy baseline |
 |---|---|---|
 | Auth (`liftosaur.py ping`) | 200, `units: kg`, warmup timer 90 s, workout timer 180 s | No unit conversion needed for this account |
-| Full pull (`analyze.py pull --full`) | **350 workouts** from 350 records, 2024-02-13 to 2026-10-11 | 334 expected. The 16 extra are sessions logged after the Hevy export, so the import looks complete |
+| Full pull (`analyze.py pull`) | **350 workouts** from 350 records, 2024-02-13 to 2026-10-11 | 334 expected. The 16 extra are sessions logged after the Hevy export, so the import looks complete |
 | Unmapped exercises | 11 custom exercises, 87 working sets in the last 8 weeks | Custom exercises carried over from Hevy, so they are not in Liftosaur's built-in list |
-| RPE | **5 top sets, average 9.0**, all from one session (2026-10-11) logged natively in Liftosaur | Hevy had **8.6 across 194 top sets**. The import dropped every `@` annotation. See below |
+| RPE | **No logged RPE.** The one session that carries RPE (2026-10-11, ten sets all `@9`) has no `+`, so per the format those are the program's prescription, not the athlete's report. The report now says "client does not log RPE". An earlier draft of this record counted them as 5 top sets averaging 9.0; the final review caught it | Hevy had **8.6 across 194 top sets**. The import dropped every `@` annotation. See below |
 | Weigh-ins (`checkin.py import-liftosaur`) | 265 weigh-in days from 271 values, 2024-01-30 to 2026-10-12, none unreadable | Hevy import was 50 weigh-ins. Liftosaur holds the longer series |
 | Trend (`trend --calories 1705 --window 30`) | `WITHIN_NOISE`: 70.47 kg average (n=18, sd 0.51) against 70.27 (n=9), +0.2 kg/week, observed TDEE 1485 kcal | Same verdict as the 2026-09-18 Hevy baseline |
 | Programs | One program, `Meso1 Push A`, id `ekjzpuyh`, current | — |
@@ -63,8 +63,8 @@ only 13 were pushing.
 3. **`playground` lists only completed sets.** With no commands it returns an empty workout and
    proves only that the program parses (a parse error comes back as 422). The client now takes
    `--command "complete_set(1, 1)"` (repeatable), and SKILL.md says so.
-4. **RPE did not survive the import.** Every Hevy-era `@` annotation is gone, so the RPE table now
-   rests on one session. The report says so honestly rather than inventing numbers, and it
+4. **RPE did not survive the import.** Every Hevy-era `@` annotation is gone, and the only RPE in
+   the account is prescribed (`@9`, no `+`), so the RPE table is empty. The report says so honestly rather than inventing numbers, and it
    rebuilds as sessions are logged in Liftosaur. Getting the history back would mean re-importing
    with RPE, which is outside this skill.
 

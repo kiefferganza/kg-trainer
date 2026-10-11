@@ -20,7 +20,7 @@ kg-trainer-data/
   data/
     workouts.jsonl           every logged workout, parsed from Liftohistory (scripts/analyze.py pull)
     measurements.json        bodyweight, one row per day, from Liftosaur's weight series
-    sync.json                {"last_pull": ISO} — drives incremental pulls
+    sync.json                {"last_pull": ISO} — when the cache was last refreshed
     free-exercise-db.json    cached photo catalog for the dashboard
   plans/
     meso-01.md               the human-readable program
@@ -29,7 +29,7 @@ kg-trainer-data/
     index.html  data.js  img/    generated; opens from disk, contains no API key
 ```
 
-`data/` is a cache and can be rebuilt with `analyze.py pull --full`. `profile.json`, `weight-log.csv`, `checkins.jsonl` and `plans/` are the irreplaceable part — they are the only record of what was decided and why.
+`data/` is a cache and is replaced wholesale by every `analyze.py pull`. `profile.json`, `weight-log.csv`, `checkins.jsonl` and `plans/` are the irreplaceable part — they are the only record of what was decided and why.
 
 ## profile.json
 

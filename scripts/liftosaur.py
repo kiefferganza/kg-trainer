@@ -183,9 +183,11 @@ def paginate(path: str, key: str, params: dict | None = None, limit: int = 200) 
         if not data.get("hasMore"):
             return out
         cursor = data.get("nextCursor")
-        # The live API sends a millisecond timestamp; accept a string too.
+        # The live API sends a millisecond timestamp; accept a string too. Anything
+        # else would end the loop with a partial history that looks complete.
         if isinstance(cursor, bool) or not isinstance(cursor, (str, int)) or cursor == "":
-            return out
+            sys.exit(f"GET {path} failed: hasMore with no usable nextCursor "
+                     f"({len(out)} records read); refusing to return a partial list")
         if cursor in seen_cursors:
             sys.exit(f"GET {path} failed: server repeated a cursor; stopping instead of looping")
         seen_cursors.add(cursor)

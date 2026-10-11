@@ -47,16 +47,16 @@ Open every session by running `scripts/paths.py`, which prints the resolved `kg-
 
 ## STEP 1 — Pull the baseline
 
-If Liftosaur is connected, one command does the whole pull (every workout record, the bodyweight series, and the sync timestamp for later incremental updates):
+If Liftosaur is connected, one command does the whole pull (every workout record and the bodyweight series; it replaces whatever the cache held before, including rows from an older backend):
 
 ```bash
-scripts/liftosaur.py ping && scripts/analyze.py pull --full
+scripts/liftosaur.py ping && scripts/analyze.py pull
 scripts/analyze.py report
 ```
 
 Liftosaur pages 200 records at a time, so even a long history is a handful of calls. `ping` prints the account's `units`; kg-trainer works in kilograms and converts pounds on read.
 
-`report` prints the tables the user needs: frequency over the last 12 weeks with the longest gap, best set and Epley estimated 1RM per main lift (working sets of ≤10 reps only), estimated 1RM now vs 8 weeks ago, working sets by muscle over 8 weeks with under-half-average and push:pull>1.5 flags, and average top-set RPE. Show them as they come out of the script — the math is the script's job, the interpretation is yours.
+`report` prints the tables the user needs: frequency over the last 12 weeks with the longest gap, best set and Epley estimated 1RM per main lift (working sets of ≤10 reps only), estimated 1RM now vs 8 weeks ago, working sets by muscle over 8 weeks with under-half-average and push:pull>1.5 flags, and average top-set RPE — counting only RPE the athlete logged (`@8+` in Liftosaur), never the `@8` a program prescribed. Show them as they come out of the script — the math is the script's job, the interpretation is yours.
 
 **Read the `unclassified_exercises` list before you trust the balance table.** An entry there is an exercise with no row in `references/exercise-muscles.json` — usually a custom exercise — so its sets are counted under `unknown` and whatever it really trains is undercounted. Say so, name the exercises and their set counts, and treat the balance flags as provisional until they are mapped. The fix is a row in the store's own `kg-trainer-data/exercise-muscles.json` (`{"bayesian curl": "biceps"}`, one of the 15 muscle names the report uses), confirmed with the user, then re-run `report`. Never edit the skill's `references/` map for a personal exercise, and never reassign a bucket by hand in the table.
 
@@ -133,7 +133,7 @@ The colour ramp is one hue and runs **dark → light as values rise**, because t
 
 | They say | Do |
 |---|---|
-| **UPDATE** | `scripts/analyze.py pull` (incremental from the last logged workout's date), then `scripts/dashboard.py build`. Report what changed in one short list. A record edited or deleted in the app is only picked up by `pull --full`. |
+| **UPDATE** | `scripts/analyze.py pull` (re-reads the whole history, so edits, deletions and late-logged sessions are picked up), then `scripts/dashboard.py build`. Report what changed in one short list. |
 | **HOW AM I DOING** | Compare logged sets against the program's targets. Say which lifts are ready to go up and which should hold, with the numbers. |
 | **PROGRESS IT** | `scripts/liftosaur.py program-get current --out plan.liftoscript`, edit the text, run `program-stats` and `playground` to check it, show before and after, get a yes, then `scripts/liftosaur.py program-push plan.liftoscript --id <id>`. |
 | **IT HURTS** | Ask where and how bad. Swap the aggravating exercises, keep the muscle trained, update the program the same way as PROGRESS IT. |
@@ -155,8 +155,7 @@ The colour ramp is one hue and runs **dark → light as values rise**, because t
 |---|---|
 | Validate key | `scripts/liftosaur.py ping` |
 | Match an exercise name | `scripts/liftosaur.py exercises "lat pulldown"` |
-| Full history pull | `scripts/analyze.py pull --full` |
-| Incremental pull | `scripts/analyze.py pull` |
+| History pull | `scripts/analyze.py pull` |
 | Baseline tables | `scripts/analyze.py report` |
 | One lift in depth | `scripts/analyze.py deep-dive "squat"` |
 | Check a program's volume | `scripts/liftosaur.py program-stats plan.liftoscript` |

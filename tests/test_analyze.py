@@ -53,11 +53,20 @@ def test_unmapped_exercise_is_named_not_silently_dropped(workouts):
     assert report["balance"]["unclassified_exercises"] == {"Mystery Machine": 2}
 
 
-def test_average_top_set_rpe_uses_the_heaviest_working_set(workouts):
+def test_average_top_set_rpe_counts_only_rpe_the_athlete_logged(workouts):
     report = analyze.build_report(workouts, MUSCLES)
-    # top sets: bench @8, pulldown @7, bench @9, pulldown @8  (Mystery has no RPE)
-    assert report["rpe"]["top_sets_with_rpe"] == 4
+    # logged top sets: bench @8+, pulldown @7+, bench @9+. The second pulldown's
+    # @8 has no '+', so it is the prescription, not what the athlete reported.
+    assert report["rpe"]["top_sets_with_rpe"] == 3
     assert report["rpe"]["average_top_set_rpe"] == pytest.approx(8.0)
+
+
+def test_prescribed_rpe_alone_is_not_reported_as_logged():
+    ws = parse_liftohistory(
+        "2026-09-01T09:00:00Z / exercises: {\n  Bench Press / 3x8 80kg @8\n}\n")
+    rpe = analyze.build_report(ws, MUSCLES)["rpe"]
+    assert rpe["top_sets_with_rpe"] == 0
+    assert "average_top_set_rpe" not in rpe
 
 
 def test_best_sets_are_keyed_by_exercise_title(workouts):
@@ -80,19 +89,37 @@ def test_pull_writes_records_with_their_api_id(store, monkeypatch):
     assert json.loads((store / "sync.json").read_text())["last_pull"]
 
 
-def test_incremental_pull_asks_for_only_new_workouts(store, monkeypatch):
+def test_pull_always_reads_the_whole_history(store, monkeypatch):
     (store / "workouts.jsonl").write_text(
         json.dumps({"id": "old", "start_time": "2026-09-01T09:00:00Z", "exercises": []}) + "\n")
-    seen = {}
+    seen = []
 
     def fake_paginate(path, key, params=None, **kw):
         if path == "/history":
-            seen.update(params or {})
+            seen.append(dict(params or {}))
         return []
 
     monkeypatch.setattr(analyze.liftosaur, "paginate", fake_paginate)
     analyze.cmd_pull(type("A", (), {"full": False})())
-    assert seen["startDate"] == "2026-09-01"
+    assert seen == [{}]
+
+
+def test_pull_replaces_rows_from_an_older_cache(store, monkeypatch):
+    # A row from the previous backend, and a Liftosaur session whose start time was later edited:
+    # neither may survive alongside the fresh pull.
+    stale = [{"id": "b8f1-old", "start_time": "2026-09-01T09:00:00+00:00",
+              "title": "Upper A", "exercises": [{"title": "Bench Press (Barbell)", "sets": []}]},
+             {"id": "r1", "start_time": "2026-08-31T09:00:00Z", "exercises": []}]
+    (store / "workouts.jsonl").write_text("".join(json.dumps(w) + "\n" for w in stale))
+    records = [{"id": "r1", "text": FIX.read_text()}]
+    monkeypatch.setattr(analyze.liftosaur, "paginate",
+                        lambda path, *a, **k: records if path == "/history" else [])
+
+    analyze.cmd_pull(type("A", (), {"full": False})())
+
+    ws = analyze.load_workouts()
+    assert [(w["id"], w["start_time"]) for w in ws] == [
+        ("r1", "2026-09-01T09:00:00Z"), ("r1", "2026-09-08T09:00:00Z")]
 
 
 WEIGHTS = [  # newest first, as the API returns them

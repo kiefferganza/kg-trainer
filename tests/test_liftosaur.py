@@ -339,12 +339,17 @@ def test_paginate_follows_a_numeric_cursor(monkeypatch):
     assert seen[1]["cursor"] == 1791752524694
 
 
-def test_paginate_stops_when_cursor_is_missing_despite_has_more(monkeypatch):
-    def fake_call(method, path, params=None, body=None):
-        return 200, {"data": {"records": [{"id": "a"}], "hasMore": True}}
+@pytest.mark.parametrize("cursor", [None, "", 1.5, True, {"at": 1}])
+def test_paginate_refuses_has_more_without_a_usable_cursor(monkeypatch, cursor):
+    # Returning the pages read so far would be a silent partial history.
+    page = {"records": [{"id": "a"}], "hasMore": True}
+    if cursor is not None:
+        page["nextCursor"] = cursor
 
-    monkeypatch.setattr(liftosaur, "call", fake_call)
-    assert len(liftosaur.paginate("/history", "records")) == 1
+    monkeypatch.setattr(liftosaur, "call", lambda *a, **k: (200, {"data": page}))
+    with pytest.raises(SystemExit) as exc:
+        liftosaur.paginate("/history", "records")
+    assert "no usable nextCursor" in str(exc.value)
 
 
 def test_paginate_passes_extra_params_through(monkeypatch):

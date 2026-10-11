@@ -7,11 +7,11 @@ figure here comes from logged sets — nothing is estimated or remembered.
 State (store root resolved by paths.py):
   kg-trainer-data/data/workouts.jsonl      every logged workout
   kg-trainer-data/data/measurements.json   bodyweight, [{"date", "weight_kg"}]
-  kg-trainer-data/data/sync.json           {"last_pull": ISO} for incremental updates
+  kg-trainer-data/data/sync.json           {"last_pull": ISO}, when the cache was last refreshed
   references/exercise-muscles.json         exercise -> primary muscle (fetch_reference.py)
 
 Usage:
-  analyze.py pull [--full]        # incremental by default; --full re-reads everything
+  analyze.py pull                 # re-read the whole history (--full is accepted, same thing)
   analyze.py report [--json]      # frequency, bests, trend, balance, RPE
   analyze.py deep-dive <pattern>  # one lift, every logged set, from the local log
 """
@@ -102,11 +102,15 @@ def pull_bodyweight() -> int:
 
 
 def cmd_pull(a):
-    params = {}
-    existing = [] if a.full else load_workouts()
-    if existing:
-        params["startDate"] = max(w["start_time"] for w in existing)[:10]
-    records = liftosaur.paginate("/history", "records", params=params)
+    """Re-read the whole history and replace the cache with it.
+
+    Liftosaur pages 200 records at a time, so a full read is a few requests.
+    Replacing rather than merging is what keeps the cache honest: a session
+    logged late with an earlier date, a session whose time was edited, a
+    deleted session, and rows left by an older backend all come out right.
+    `--full` is accepted for compatibility; every pull is full.
+    """
+    records = liftosaur.paginate("/history", "records")
 
     parsed: list[dict] = []
     for record in records:
@@ -114,15 +118,14 @@ def cmd_pull(a):
             workout["id"] = record.get("id")
             parsed.append(workout)
 
-    merged = {(w["id"], w["start_time"]): w for w in existing}
-    merged.update({(w["id"], w["start_time"]): w for w in parsed})
-    save_workouts(list(merged.values()))
+    previous = len(load_workouts())
+    save_workouts(parsed)
 
     DATA.mkdir(parents=True, exist_ok=True)
     weigh_ins = pull_bodyweight()
     SYNC.write_text(json.dumps({"last_pull": now_iso()}))
-    print(f"{len(parsed)} workouts parsed from {len(records)} records; "
-          f"{len(merged)} total in {WORKOUTS}; {weigh_ins} weigh-in days")
+    print(f"{len(parsed)} workouts parsed from {len(records)} records "
+          f"(cache held {previous}); {weigh_ins} weigh-in days -> {DATA}")
 
 
 def epley(weight, reps):
@@ -239,8 +242,11 @@ def build_report(ws: list[dict], muscles: dict) -> dict:
         if parse_ts(w["start_time"]) < w8:
             continue
         for e in w.get("exercises", []):
+            # '@8+' is RPE the athlete logged; a bare '@8' is the prescription
+            # carried onto the set, which says nothing about how it felt.
             cand = [s for s in e.get("sets", [])
-                    if s.get("type") != "warmup" and s.get("rpe") is not None]
+                    if s.get("type") != "warmup" and s.get("rpe") is not None
+                    and s.get("rpe_logged")]
             if cand:
                 rpes.append(max(cand, key=lambda s: s.get("weight_kg") or 0)["rpe"])
     rep["rpe"] = ({"top_sets_with_rpe": len(rpes), "average_top_set_rpe": round(statistics.fmean(rpes), 2)}
