@@ -115,11 +115,6 @@ def test_pull_writes_bodyweight_from_the_weight_series(store, monkeypatch):
                     {"date": "2026-10-11", "weight_kg": 69.9}]
 
 
-@pytest.mark.parametrize("value", ["", "kg", "seventy", None, 70])
-def test_unreadable_weight_value_is_skipped_not_invented(value):
-    assert analyze.weight_kg(value) is None
-
-
 def test_deep_dive_reads_every_logged_set_from_the_local_log(workouts, capsys):
     analyze.deep_dive(workouts, "bench")
     out = capsys.readouterr().out

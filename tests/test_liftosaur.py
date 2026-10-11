@@ -1,4 +1,5 @@
 import argparse
+import datetime as dt
 import email.message
 import io
 import json
@@ -496,3 +497,30 @@ def test_the_suite_never_sees_a_real_dotenv_up_the_tree():
     start = pathlib.Path.cwd().resolve()
     reachable = [d / ".env" for d in (start, *start.parents) if (d / ".env").is_file()]
     assert reachable == [], f"a real .env is reachable from the test cwd: {reachable}"
+
+
+PHT = dt.timezone(dt.timedelta(hours=8))
+
+
+def test_weigh_in_reads_the_live_value_shape():
+    entry = {"timestamp": 1791589198878, "date": "2026-10-09T23:39:58.878Z", "value": "69.7kg"}
+    assert liftosaur.weigh_in(entry, tz=PHT) == (dt.date(2026, 10, 10), 69.7)
+
+
+def test_weigh_in_converts_pounds():
+    day, kg = liftosaur.weigh_in({"date": "2026-10-01T07:00:00Z", "value": "154lb"})
+    assert str(day) == "2026-10-01"
+    assert kg == pytest.approx(154 * 0.45359237, abs=0.01)
+
+
+@pytest.mark.parametrize("entry", [
+    {"date": "2026-10-01T07:00:00Z", "value": "70"},        # no unit: never assumed
+    {"date": "2026-10-01T07:00:00Z", "value": "seventy kg"},
+    {"date": "2026-10-01T07:00:00Z", "value": 70},
+    {"date": "2026-10-01T07:00:00Z", "value": None},
+    {"date": "not a date", "value": "70kg"},
+    {"value": "70kg"},
+    "70kg",
+])
+def test_weigh_in_refuses_what_it_cannot_read(entry):
+    assert liftosaur.weigh_in(entry) is None

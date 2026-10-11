@@ -22,7 +22,6 @@ import argparse
 import datetime as dt
 import json
 import pathlib
-import re
 import statistics
 import sys
 
@@ -30,7 +29,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import liftosaur  # noqa: E402  — reuse the one API client
 import paths  # noqa: E402
 from fetch_reference import muscle_for  # noqa: E402
-from liftohistory import LB_TO_KG, parse_liftohistory  # noqa: E402
+from liftohistory import parse_liftohistory  # noqa: E402
 
 STATE = paths.state_dir()
 DATA = STATE / "data"
@@ -73,25 +72,15 @@ def save_workouts(ws: list[dict]):
             f.write(json.dumps(w) + "\n")
 
 
-def weight_kg(value) -> float | None:
-    """'69.9kg' -> 69.9, '154lb' -> 69.85. Anything without a unit is unreadable."""
-    m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*(kg|lb)\s*", value) if isinstance(value, str) else None
-    if not m:
-        return None
-    n = float(m.group(1))
-    return round(n * LB_TO_KG, 2) if m.group(2) == "lb" else round(n, 2)
-
-
 def pull_bodyweight() -> int:
     """Rewrite MEASUREMENTS from the full weight series: one row per day, latest wins."""
     by_day: dict[str, tuple] = {}
     for v in liftosaur.paginate("/measurements/weight", "values"):
-        if not isinstance(v, dict) or not isinstance(v.get("date"), str):
+        read = liftosaur.weigh_in(v)
+        if read is None:
             continue
-        kg = weight_kg(v.get("value"))
-        if kg is None:
-            continue
-        day, ts = v["date"][:10], v.get("timestamp") or 0
+        day, kg = read[0].isoformat(), read[1]
+        ts = v.get("timestamp") or 0
         if day not in by_day or ts > by_day[day][0]:
             by_day[day] = (ts, kg)
     rows = [{"date": d, "weight_kg": kg} for d, (_, kg) in sorted(by_day.items())]

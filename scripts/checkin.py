@@ -8,7 +8,7 @@ State lives in kg-trainer-data (store root resolved by paths.py):
 
 Usage:
   checkin.py log-weight <YYYY-MM-DD> <KG> [--fat PCT] [--waist CM]
-  checkin.py import-hevy                   # pull body measurements from Hevy into the log
+  checkin.py import-liftosaur              # pull weigh-ins from Liftosaur into the log
   checkin.py trend [--window 7] [--calories N]
   checkin.py record --calories N --protein G --carbs G --fat G [--notes TEXT]
   checkin.py history [--last N]
@@ -23,11 +23,10 @@ import argparse
 import csv
 import datetime as dt
 import json
-import pathlib
 import statistics
-import subprocess
 import sys
 
+import liftosaur
 import paths
 
 HOME = paths.state_dir()
@@ -51,44 +50,51 @@ def load_weights() -> list[tuple[dt.date, float]]:
     return sorted(rows)
 
 
-def cmd_log_weight(a):
+def _append_weight(date: str, weight_kg: float, fat_percent, waist_cm):
     HOME.mkdir(parents=True, exist_ok=True)
     new = not WEIGHTS.exists()
+    with WEIGHTS.open("a", newline="") as f:
+        w = csv.writer(f)
+        if new:
+            w.writerow(["date", "weight_kg", "fat_percent", "waist_cm"])
+        w.writerow([date, weight_kg, fat_percent if fat_percent is not None else "",
+                    waist_cm if waist_cm is not None else ""])
+
+
+def cmd_log_weight(a):
     existing = {d.isoformat() for d, _ in load_weights()}
     if a.date in existing:
         sys.exit(f"{a.date} already logged. Edit {WEIGHTS} directly to correct it.")
-    with WEIGHTS.open("a", newline="") as f:
-        w = csv.writer(f)
-        if new:
-            w.writerow(["date", "weight_kg", "fat_percent", "waist_cm"])
-        w.writerow([a.date, a.weight, a.fat if a.fat is not None else "",
-                    a.waist if a.waist is not None else ""])
+    _append_weight(a.date, a.weight, a.fat, a.waist)
     print(f"logged {a.date}: {a.weight} kg")
 
 
-def cmd_import_hevy(a):
-    """Pull body measurements from Hevy so the local log is not the only source."""
-    here = pathlib.Path(__file__).parent / "hevy.py"
-    out = subprocess.run([sys.executable, str(here), "measurements", "--pages", "5"],
-                         capture_output=True, text=True)
-    if out.returncode != 0:
-        sys.exit(f"hevy.py measurements failed:\n{out.stderr.strip()}")
-    rows = json.loads(out.stdout or "[]")
-    existing = {d.isoformat() for d, _ in load_weights()}
-    HOME.mkdir(parents=True, exist_ok=True)
+def cmd_import_liftosaur(a):
+    """Pull weigh-ins from Liftosaur so the local log is not the only source.
+
+    Days already in the log are left alone, so a hand-logged entry wins. When
+    a day has several weigh-ins, the latest one is imported.
+    """
+    values = liftosaur.paginate("/measurements/weight", "values")
+    latest: dict[dt.date, tuple] = {}
+    unreadable = 0
+    for v in values:
+        read = liftosaur.weigh_in(v)
+        if read is None:
+            unreadable += 1
+            continue
+        ts = v.get("timestamp") or 0
+        if read[0] not in latest or ts > latest[read[0]][0]:
+            latest[read[0]] = (ts, read[1])
+    existing = {d for d, _ in load_weights()}
     added = 0
-    new = not WEIGHTS.exists()
-    with WEIGHTS.open("a", newline="") as f:
-        w = csv.writer(f)
-        if new:
-            w.writerow(["date", "weight_kg", "fat_percent", "waist_cm"])
-        for r in rows:
-            if r.get("weight_kg") is None or r["date"] in existing:
-                continue
-            w.writerow([r["date"], r["weight_kg"], r.get("fat_percent") or "", r.get("waist") or ""])
-            existing.add(r["date"])
-            added += 1
-    print(f"imported {added} new weigh-ins from Hevy ({len(rows)} measurements seen)")
+    for day in sorted(latest):
+        if day in existing:
+            continue
+        _append_weight(day.isoformat(), latest[day][1], None, None)
+        added += 1
+    print(f"imported {added} new weigh-ins from Liftosaur ({len(values)} values seen"
+          + (f", {unreadable} unreadable and skipped" if unreadable else "") + ")")
 
 
 def window_avg(rows, end: dt.date, days: int):
@@ -191,7 +197,7 @@ def main():
     c.add_argument("--fat", type=float); c.add_argument("--waist", type=float)
     c.set_defaults(fn=cmd_log_weight)
 
-    sub.add_parser("import-hevy").set_defaults(fn=cmd_import_hevy)
+    sub.add_parser("import-liftosaur").set_defaults(fn=cmd_import_liftosaur)
 
     c = sub.add_parser("trend"); c.add_argument("--window", type=int, default=7)
     c.add_argument("--calories", type=int); c.set_defaults(fn=cmd_trend)

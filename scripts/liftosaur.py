@@ -22,10 +22,12 @@ reports the HTTP status, not the key.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import http.client
 import json
 import os
 import pathlib
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -185,6 +187,33 @@ def paginate(path: str, key: str, params: dict | None = None, limit: int = 200) 
             sys.exit(f"GET {path} failed: server repeated a cursor; stopping instead of looping")
         seen_cursors.add(cursor)
         query["cursor"] = cursor
+
+
+LB_TO_KG = 0.45359237
+_WEIGHT_RE = re.compile(r"\s*(\d+(?:\.\d+)?)\s*(kg|lb)\s*")
+
+
+def weigh_in(entry, tz: dt.tzinfo | None = None) -> tuple[dt.date, float] | None:
+    """One /measurements/weight value as (local date, kg), or None if unreadable.
+
+    The API sends {"timestamp": ms, "date": ISO-UTC, "value": "69.9kg"}. The day
+    is taken in the local zone (or `tz`), because a morning weigh-in east of UTC
+    falls on the previous UTC date. A value with no unit is refused, never assumed.
+    """
+    if not isinstance(entry, dict):
+        return None
+    stamp, value = entry.get("date"), entry.get("value")
+    m = _WEIGHT_RE.fullmatch(value) if isinstance(value, str) else None
+    if not m or not isinstance(stamp, str):
+        return None
+    try:
+        when = dt.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=dt.timezone.utc)
+    kg = float(m.group(1)) * (LB_TO_KG if m.group(2) == "lb" else 1.0)
+    return when.astimezone(tz).date(), round(kg, 2)
 
 
 # --- commands -------------------------------------------------------------

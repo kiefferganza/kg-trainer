@@ -1,6 +1,7 @@
 import os
 import pathlib
 import tempfile
+import time
 
 import pytest
 
@@ -12,6 +13,12 @@ import pytest
 _STORE = pathlib.Path(tempfile.mkdtemp(prefix="kg-trainer-test-")) / "kg-trainer-data"
 _STORE.mkdir(parents=True, exist_ok=True)
 os.environ["KG_TRAINER_HOME"] = str(_STORE)
+
+# Weigh-in timestamps are converted to the machine's local date. Pin the zone so
+# expected dates do not depend on where the suite runs; tests that care about
+# the conversion pass an explicit zone.
+os.environ["TZ"] = "UTC"
+time.tzset()
 
 
 @pytest.fixture(autouse=True)
