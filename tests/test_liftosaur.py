@@ -318,6 +318,25 @@ def test_paginate_follows_the_cursor_until_has_more_is_false(monkeypatch):
     assert seen[1]["cursor"] == "cur1"
 
 
+def test_paginate_follows_a_numeric_cursor(monkeypatch):
+    # The live API returns nextCursor as a millisecond timestamp, not a string.
+    pages = [
+        (200, {"data": {"records": [{"id": "a"}], "hasMore": True,
+                        "nextCursor": 1791752524694}}),
+        (200, {"data": {"records": [{"id": "b"}], "hasMore": False}}),
+    ]
+    seen = []
+
+    def fake_call(method, path, params=None, body=None):
+        seen.append(dict(params or {}))
+        return pages[len(seen) - 1]
+
+    monkeypatch.setattr(liftosaur, "call", fake_call)
+    out = liftosaur.paginate("/history", "records")
+    assert [r["id"] for r in out] == ["a", "b"]
+    assert seen[1]["cursor"] == 1791752524694
+
+
 def test_paginate_stops_when_cursor_is_missing_despite_has_more(monkeypatch):
     def fake_call(method, path, params=None, body=None):
         return 200, {"data": {"records": [{"id": "a"}], "hasMore": True}}

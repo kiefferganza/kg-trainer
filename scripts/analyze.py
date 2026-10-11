@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""Baseline analysis of a Hevy training history.
+"""Baseline analysis of a Liftosaur training history.
 
 Caches the full log locally, then computes the numbers a coach needs. Every
 figure here comes from logged sets — nothing is estimated or remembered.
 
 State (store root resolved by paths.py):
   kg-trainer-data/data/workouts.jsonl      every logged workout
-  kg-trainer-data/data/measurements.json   body measurements
+  kg-trainer-data/data/measurements.json   bodyweight, [{"date", "weight_kg"}]
   kg-trainer-data/data/sync.json           {"last_pull": ISO} for incremental updates
-  kg-trainer-data/exercise-templates.jsonl the catalog (hevy.py catalog)
+  references/exercise-muscles.json         exercise -> primary muscle (fetch_reference.py)
 
 Usage:
   analyze.py pull [--full]        # incremental by default; --full re-reads everything
   analyze.py report [--json]      # frequency, bests, trend, balance, RPE
-  analyze.py deep-dive <pattern>  # one lift, every logged set, via exercise_history
+  analyze.py deep-dive <pattern>  # one lift, every logged set, from the local log
 """
 
 from __future__ import annotations
@@ -22,18 +22,22 @@ import argparse
 import datetime as dt
 import json
 import pathlib
+import re
 import statistics
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-import hevy  # noqa: E402  — reuse the one API client
+import liftosaur  # noqa: E402  — reuse the one API client
 import paths  # noqa: E402
+from fetch_reference import muscle_for  # noqa: E402
+from liftohistory import LB_TO_KG, parse_liftohistory  # noqa: E402
 
 STATE = paths.state_dir()
 DATA = STATE / "data"
 WORKOUTS = DATA / "workouts.jsonl"
 MEASUREMENTS = DATA / "measurements.json"
 SYNC = DATA / "sync.json"
+MUSCLE_MAP = pathlib.Path(__file__).resolve().parent.parent / "references" / "exercise-muscles.json"
 
 # Muscle groups that a push/pull ratio is computed over. Legs, core and
 # everything else are deliberately excluded — they belong to neither side.
@@ -56,11 +60,10 @@ def load_workouts() -> list[dict]:
     return sorted(ws, key=lambda w: w["start_time"])
 
 
-def load_catalog() -> dict[str, dict]:
-    p = STATE / "exercise-templates.jsonl"
-    if not p.exists():
-        sys.exit("No exercise catalog. Run: hevy.py catalog")
-    return {json.loads(l)["id"]: json.loads(l) for l in p.open() if l.strip()}
+def load_muscles() -> dict[str, str]:
+    if not MUSCLE_MAP.exists():
+        sys.exit(f"No muscle map at {MUSCLE_MAP}. Run: scripts/fetch_reference.py")
+    return json.loads(MUSCLE_MAP.read_text())
 
 
 def save_workouts(ws: list[dict]):
@@ -70,49 +73,54 @@ def save_workouts(ws: list[dict]):
             f.write(json.dumps(w) + "\n")
 
 
+def weight_kg(value) -> float | None:
+    """'69.9kg' -> 69.9, '154lb' -> 69.85. Anything without a unit is unreadable."""
+    m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*(kg|lb)\s*", value) if isinstance(value, str) else None
+    if not m:
+        return None
+    n = float(m.group(1))
+    return round(n * LB_TO_KG, 2) if m.group(2) == "lb" else round(n, 2)
+
+
+def pull_bodyweight() -> int:
+    """Rewrite MEASUREMENTS from the full weight series: one row per day, latest wins."""
+    by_day: dict[str, tuple] = {}
+    for v in liftosaur.paginate("/measurements/weight", "values"):
+        if not isinstance(v, dict) or not isinstance(v.get("date"), str):
+            continue
+        kg = weight_kg(v.get("value"))
+        if kg is None:
+            continue
+        day, ts = v["date"][:10], v.get("timestamp") or 0
+        if day not in by_day or ts > by_day[day][0]:
+            by_day[day] = (ts, kg)
+    rows = [{"date": d, "weight_kg": kg} for d, (_, kg) in sorted(by_day.items())]
+    MEASUREMENTS.write_text(json.dumps(rows, indent=2))
+    return len(rows)
+
+
 def cmd_pull(a):
+    params = {}
+    existing = [] if a.full else load_workouts()
+    if existing:
+        params["startDate"] = max(w["start_time"] for w in existing)[:10]
+    records = liftosaur.paginate("/history", "records", params=params)
+
+    parsed: list[dict] = []
+    for record in records:
+        for workout in parse_liftohistory(record.get("text") or ""):
+            workout["id"] = record.get("id")
+            parsed.append(workout)
+
+    merged = {(w["id"], w["start_time"]): w for w in existing}
+    merged.update({(w["id"], w["start_time"]): w for w in parsed})
+    save_workouts(list(merged.values()))
+
     DATA.mkdir(parents=True, exist_ok=True)
-    existing = {w["id"]: w for w in load_workouts()}
-    last = None
-    if SYNC.exists() and not a.full:
-        last = json.loads(SYNC.read_text()).get("last_pull")
-
-    if last and existing:
-        # Incremental: /workouts/events reports both edits and deletions.
-        page, updated, deleted = 1, 0, 0
-        while True:
-            body = hevy.ok(*hevy.call("GET", "/v1/workouts/events",
-                                      {"since": last, "page": page, "pageSize": 10}),
-                           "workout events")
-            for ev in body.get("events", []):
-                if ev.get("type") == "deleted":
-                    if existing.pop(ev["id"], None):
-                        deleted += 1
-                else:
-                    existing[ev["workout"]["id"]] = ev["workout"]
-                    updated += 1
-            if page >= body.get("page_count", 1):
-                break
-            page += 1
-        print(f"incremental: {updated} added/updated, {deleted} deleted since {last}")
-    else:
-        rows = hevy.paginate("/v1/workouts", "workouts", 10, None)
-        existing = {w["id"]: w for w in rows}
-        print(f"full pull: {len(rows)} workouts")
-
-    save_workouts(list(existing.values()))
-    # Measurements come back newest-first and pageSize caps at 10, so a full
-    # re-read costs a page per 10 weigh-ins. Read everything once, then only
-    # the recent pages — merging on date, which is the natural key.
-    prior = {m["date"]: m for m in (json.loads(MEASUREMENTS.read_text())
-                                    if MEASUREMENTS.exists() else [])}
-    pages = None if (a.full or not prior) else 3
-    for m in hevy.paginate("/v1/body_measurements", "body_measurements", 10, pages):
-        prior[m["date"]] = m
-    meas = sorted(prior.values(), key=lambda m: m["date"])
-    MEASUREMENTS.write_text(json.dumps(meas, indent=2))
+    weigh_ins = pull_bodyweight()
     SYNC.write_text(json.dumps({"last_pull": now_iso()}))
-    print(f"{len(existing)} workouts, {len(meas)} measurements -> {DATA}")
+    print(f"{len(parsed)} workouts parsed from {len(records)} records; "
+          f"{len(merged)} total in {WORKOUTS}; {weigh_ins} weigh-in days")
 
 
 def epley(weight, reps):
@@ -134,7 +142,7 @@ def working_sets(ws: list[dict], since: dt.datetime | None = None):
                 yield w, e, s
 
 
-def build_report(ws: list[dict], cat: dict) -> dict:
+def build_report(ws: list[dict], muscles: dict) -> dict:
     if not ws:
         return {"workout_count": 0,
                 "message": "No logged workouts. Ask the client for a paste, an export, "
@@ -163,25 +171,23 @@ def build_report(ws: list[dict], cat: dict) -> dict:
     # --- Rank lifts by working-set count, then best set + estimated 1RM.
     counts: dict[str, int] = {}
     for _, e, _ in working_sets(ws):
-        counts[e["exercise_template_id"]] = counts.get(e["exercise_template_id"], 0) + 1
+        counts[e["title"]] = counts.get(e["title"], 0) + 1
     top = sorted(counts, key=counts.get, reverse=True)[:6]
 
     bests, trend = [], []
-    for tid in top:
-        title = cat.get(tid, {}).get("title") or next(
-            (e["title"] for _, e, _ in working_sets(ws) if e["exercise_template_id"] == tid), tid)
-        sets = [(w, s) for w, e, s in working_sets(ws) if e["exercise_template_id"] == tid]
+    for title in top:
+        sets = [(w, s) for w, e, s in working_sets(ws) if e["title"] == title]
         scored = [(e1, w, s) for w, s in sets
                   if (e1 := epley(s.get("weight_kg"), s.get("reps")))]
         if not scored:
-            bests.append({"exercise": title, "sets_logged": counts[tid],
+            bests.append({"exercise": title, "sets_logged": counts[title],
                           "note": "no weight x reps <=10 sets — bodyweight or timed work"})
             continue
         best = max(scored, key=lambda x: x[0])
         heaviest = max((s for _, s in sets if s.get("weight_kg")),
                        key=lambda s: s["weight_kg"], default=None)
         bests.append({
-            "exercise": title, "sets_logged": counts[tid],
+            "exercise": title, "sets_logged": counts[title],
             "heaviest_set": (f"{heaviest['weight_kg']}kg x {heaviest.get('reps')}"
                              if heaviest else None),
             "best_e1rm_kg": round(best[0], 1),
@@ -202,11 +208,11 @@ def build_report(ws: list[dict], cat: dict) -> dict:
 
     # --- Balance: working sets by primary muscle group over the last 8 weeks.
     by_muscle: dict[str, int] = {}
-    vague: dict[str, int] = {}  # what lands in Hevy's catch-all groups
+    vague: dict[str, int] = {}  # exercises missing from the muscle map
     for _, e, _ in working_sets(ws, since=w8):
-        mg = cat.get(e["exercise_template_id"], {}).get("primary_muscle_group") or "unknown"
+        mg = muscle_for(e["title"], muscles)
         by_muscle[mg] = by_muscle.get(mg, 0) + 1
-        if mg in ("other", "unknown", "full_body"):
+        if mg == "unknown":
             vague[e["title"]] = vague.get(e["title"], 0) + 1
     avg = statistics.fmean(by_muscle.values()) if by_muscle else 0
     push = sum(v for k, v in by_muscle.items() if k in PUSH)
@@ -219,9 +225,9 @@ def build_report(ws: list[dict], cat: dict) -> dict:
         "push_sets": push, "pull_sets": pull,
         "push_pull_ratio": round(push / pull, 2) if pull else None,
         "push_pull_flag": bool(pull and push / pull > 1.5),
-        # Hevy files a lot of machine work under "other", which makes the
-        # balance table lie by omission. Name the exercises so the coach can
-        # reassign them by hand instead of trusting a catch-all bucket.
+        # An entry here is an exercise with no row in exercise-muscles.json, so
+        # its sets are counted under "unknown" and every muscle it trains is
+        # undercounted. The fix is to add it to the map, not to adjust the table.
         "unclassified_exercises": dict(sorted(vague.items(), key=lambda x: -x[1])),
     }
 
@@ -283,8 +289,9 @@ def fmt(rep: dict) -> str:
               + ("  ⚠ above 1.5:1" if b["push_pull_flag"] else ""), ""]
     if b["unclassified_exercises"]:
         tot = sum(b["unclassified_exercises"].values())
-        L += [f"{tot} of those sets are filed under a catch-all group by Hevy, so the table "
-              f"above undercounts whatever they really train:", ""]
+        L += [f"{tot} of those sets are from exercises missing from "
+              f"references/exercise-muscles.json, so the table above undercounts "
+              f"whatever they really train:", ""]
         L += [f"- {k} — {v} sets" for k, v in list(b["unclassified_exercises"].items())[:12]]
         L += [""]
     r = rep["rpe"]
@@ -300,26 +307,29 @@ def fmt(rep: dict) -> str:
 
 
 def cmd_report(a):
-    ws, cat = load_workouts(), load_catalog()
-    rep = build_report(ws, cat)
+    rep = build_report(load_workouts(), load_muscles())
     print(json.dumps(rep, indent=2) if a.json else fmt(rep))
 
 
+def deep_dive(ws: list[dict], pattern: str):
+    """Every logged set of the first exercise whose title contains `pattern`."""
+    needle = pattern.lower()
+    title = next((e["title"] for w in ws for e in w.get("exercises", [])
+                  if needle in e["title"].lower()), None)
+    if title is None:
+        sys.exit(f"No logged exercise matches {pattern!r}. Run: analyze.py pull")
+    rows = [(w, s) for w in ws for e in w.get("exercises", []) if e["title"] == title
+            for s in e.get("sets", [])]
+    work = [(w, s) for w, s in rows if s.get("type") != "warmup"]
+    print(f"{title}: {len(rows)} logged sets, {len(work)} working")
+    scored = [(e1, w, s) for w, s in work if (e1 := epley(s.get("weight_kg"), s.get("reps")))]
+    for e1, w, s in sorted(scored, key=lambda x: -x[0])[:10]:
+        print(f"  {w['start_time'][:10]}  {s['weight_kg']}kg x {s['reps']}"
+              f"  rpe {s.get('rpe')}  -> e1RM {e1:.1f}")
+
+
 def cmd_deep_dive(a):
-    cat = load_catalog()
-    hits = [t for t in cat.values() if a.pattern.lower() in t["title"].lower()]
-    if not hits:
-        sys.exit(f"No catalog exercise matches {a.pattern!r}")
-    t = hits[0]
-    body = hevy.ok(*hevy.call("GET", f"/v1/exercise_history/{t['id']}"), "exercise history")
-    rows = body.get("exercise_history", [])
-    work = [r for r in rows if r.get("set_type") != "warmup"]
-    print(f"{t['title']} ({t['id']}): {len(rows)} logged sets, {len(work)} working")
-    scored = [(epley(r.get("weight_kg"), r.get("reps")), r) for r in work]
-    scored = [x for x in scored if x[0]]
-    for e, r in sorted(scored, key=lambda x: -x[0])[:10]:
-        print(f"  {r['workout_start_time'][:10]}  {r['weight_kg']}kg x {r['reps']}"
-              f"  rpe {r.get('rpe')}  -> e1RM {e:.1f}")
+    deep_dive(load_workouts(), a.pattern)
 
 
 def main():

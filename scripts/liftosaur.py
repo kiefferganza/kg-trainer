@@ -166,7 +166,7 @@ def paginate(path: str, key: str, params: dict | None = None, limit: int = 200) 
     query = dict(params or {})
     query["limit"] = limit
     out: list[dict] = []
-    seen_cursors: set[str] = set()
+    seen_cursors: set = set()
     while True:
         data = ok(*call("GET", path, params=query), f"GET {path}")
         if not isinstance(data, dict):
@@ -178,7 +178,8 @@ def paginate(path: str, key: str, params: dict | None = None, limit: int = 200) 
         if not data.get("hasMore"):
             return out
         cursor = data.get("nextCursor")
-        if not cursor or not isinstance(cursor, str):
+        # The live API sends a millisecond timestamp; accept a string too.
+        if isinstance(cursor, bool) or not isinstance(cursor, (str, int)) or cursor == "":
             return out
         if cursor in seen_cursors:
             sys.exit(f"GET {path} failed: server repeated a cursor; stopping instead of looping")
