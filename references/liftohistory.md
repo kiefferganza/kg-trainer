@@ -1,0 +1,56 @@
+# Liftohistory Format Reference
+
+Liftohistory is a human-readable text format for workout history records in Liftosaur.
+
+## Format
+
+```
+// Optional workout note
+2026-02-28T10:45:30Z / program: "5/3/1 For Beginners" / dayName: "Push Day" / week: 1 / dayInWeek: 5 / duration: 1235s / exercises: {
+  // Optional exercise note
+  Bench Press, Barbell / 3x8 185lb @7, 1x6 185lb @9 / warmup: 1x10 95lb, 1x5 135lb / target: 3x8-12 185lb @8 90s
+  OHP / 3x10 95lb / target: 3x10 95lb 60s
+  Pull Ups / 3x8|7 0lb / target: 3x10 0lb 60s
+  Wall Sit / 2x1 0kg 60s, 1x1 0kg 52s / target: 3x1 0kg 60s|45s
+}
+```
+
+## Syntax Details
+
+### Workout Header
+`date / program: "name" / dayName: "name" / week: N / dayInWeek: N / duration: Ns / exercises: {`
+- Date is ISO 8601 format
+- All metadata fields are optional except the exercises block
+
+### Exercise Line
+`ExerciseName[, Equipment] / completed sets / warmup: sets / target: sets`
+
+### Set Notation
+- `3x8 185lb` — 3 sets of 8 reps at 185lb
+- `1x5+ 185lb` — AMRAP set (5+ reps)
+- `3x8 185lb @7` — with RPE
+- `3x8 185lb @8+` — with logged RPE
+- `3x8|7 0lb` — unilateral: 8 right, 7 left
+- Units always explicit: `lb` or `kg`
+
+### Timed sets (holds)
+In completed sets, a duration is the time the user held the set:
+- `1x1 0kg 52s` — held for 52 seconds
+- `1x1|1 40s|35s` — unilateral hold: 40s right, 35s left (same order as `8|7` reps)
+- `1x1|1 ?|35s` — only the left side was recorded
+
+In target sets, a duration is the rest timer, and `setTimer|restTimer` is a timed set, same as in Liftoscript:
+- `3x8 185lb 90s` — 90s rest
+- `3x1 0kg 60s|45s` — hold for 60s, then rest 45s
+- `1x1 30s+|60s` — hold for at least 30s, the timer keeps counting until the user stops it
+- `1x1 60s|?` — hold for 60s, default rest
+
+### Sections
+- Completed sets come first (what user actually did)
+- `warmup:` prefix for warmup sets
+- `target:` prefix for prescribed sets (timer is inline, e.g. `3x8 185lb 90s`)
+
+### Notes
+- `//` at start of line = workout or exercise note
+- Workouts separated by blank lines
+- Closing `}` on its own line
