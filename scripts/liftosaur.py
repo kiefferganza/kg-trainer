@@ -45,8 +45,9 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-# Process-wide: urllib.request.urlopen uses this opener from here on.
-urllib.request.install_opener(urllib.request.build_opener(_NoRedirect))
+# Module-private on purpose: installing it globally would change urllib for every
+# importer of this module (dashboard.py downloads through plain urlopen).
+_OPENER = urllib.request.build_opener(_NoRedirect)
 
 
 def api_key() -> str:
@@ -73,7 +74,7 @@ def call(method: str, path: str, params: dict | None = None, body: dict | None =
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, method=method, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=60) as response:
+        with _OPENER.open(req, timeout=60) as response:
             status, raw = response.status, response.read()
     except urllib.error.HTTPError as exc:
         try:
@@ -85,7 +86,7 @@ def call(method: str, path: str, params: dict | None = None, body: dict | None =
     try:
         return status, json.loads(raw or b"null")
     except ValueError as exc:
-        if status >= 400:
+        if status >= 300:
             return status, None
         sys.exit(f"{method} {path} failed: HTTP {status}, response was not JSON "
                  f"({type(exc).__name__})")
@@ -93,7 +94,7 @@ def call(method: str, path: str, params: dict | None = None, body: dict | None =
 
 def ok(status: int, payload, what: str):
     """Unwrap {"data": ...}, or exit with the status. Never echoes the key."""
-    if status >= 400:
+    if status >= 300:
         error = payload.get("error") if isinstance(payload, dict) else None
         error = error if isinstance(error, dict) else {}
         detail = " ".join(str(x) for x in (error.get("code"), error.get("message")) if x)
@@ -102,6 +103,8 @@ def ok(status: int, payload, what: str):
             hint = "  (check the key, and that the subscription is active)"
         elif status == 422:
             hint = "  (invalid Liftoscript -- run program-stats or playground to locate it)"
+        elif status < 400:
+            hint = "  (redirect not followed: the API moved or a proxy answered; the key was not forwarded)"
         sys.exit(f"{what} failed: HTTP {status} {detail}{hint}".rstrip())
     if not isinstance(payload, dict):
         sys.exit(f"{what} failed: response was not a JSON object")

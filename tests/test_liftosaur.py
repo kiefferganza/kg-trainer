@@ -51,7 +51,7 @@ def test_failed_request_never_leaks_the_key(monkeypatch, capsys, code, body):
     def fake_urlopen(req, timeout=None):
         raise _http_error(code, body)
 
-    monkeypatch.setattr(liftosaur.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(liftosaur._OPENER, "open", fake_urlopen)
     with pytest.raises(SystemExit) as exc:
         liftosaur.ok(*liftosaur.call("GET", "/settings"), "GET /settings")
     message = str(exc.value) + capsys.readouterr().err
@@ -65,7 +65,7 @@ def test_network_error_names_the_exception_and_never_leaks_the_key(monkeypatch):
     def fake_urlopen(req, timeout=None):
         raise urllib.error.URLError(f"no route, token={KEY}")
 
-    monkeypatch.setattr(liftosaur.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(liftosaur._OPENER, "open", fake_urlopen)
     with pytest.raises(SystemExit) as exc:
         liftosaur.call("GET", "/settings")
     assert "URLError" in str(exc.value)
@@ -78,7 +78,7 @@ def test_timeout_names_the_exception(monkeypatch):
     def fake_urlopen(req, timeout=None):
         raise TimeoutError("timed out")
 
-    monkeypatch.setattr(liftosaur.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(liftosaur._OPENER, "open", fake_urlopen)
     with pytest.raises(SystemExit) as exc:
         liftosaur.call("GET", "/settings")
     assert "TimeoutError" in str(exc.value)
@@ -86,7 +86,7 @@ def test_timeout_names_the_exception(monkeypatch):
 
 def test_non_json_success_body_exits_naming_the_exception(monkeypatch):
     monkeypatch.setenv("LIFTOSAUR_API_KEY", KEY)
-    monkeypatch.setattr(liftosaur.urllib.request, "urlopen",
+    monkeypatch.setattr(liftosaur._OPENER, "open",
                         lambda req, timeout=None: _Resp(200, b"<html>captive portal</html>"))
     with pytest.raises(SystemExit) as exc:
         liftosaur.call("GET", "/settings")
@@ -100,7 +100,7 @@ def test_non_json_error_body_reports_the_status(monkeypatch):
     def fake_urlopen(req, timeout=None):
         raise _http_error(500, b"<html>oops</html>")
 
-    monkeypatch.setattr(liftosaur.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(liftosaur._OPENER, "open", fake_urlopen)
     assert liftosaur.call("GET", "/settings") == (500, None)
     with pytest.raises(SystemExit) as exc:
         liftosaur.ok(500, None, "GET /settings")
@@ -113,6 +113,42 @@ def test_422_hint_points_at_liftoscript():
                      "POST /program-stats")
     assert "HTTP 422" in str(exc.value)
     assert "Liftoscript" in str(exc.value)
+
+
+def test_refused_redirect_with_html_body_says_so_without_the_url(monkeypatch):
+    monkeypatch.setenv("LIFTOSAUR_API_KEY", KEY)
+
+    def fake_urlopen(req, timeout=None):
+        raise _http_error(302, b"<html>moved</html>")
+
+    monkeypatch.setattr(liftosaur._OPENER, "open", fake_urlopen)
+    assert liftosaur.call("GET", "/settings") == (302, None)
+    with pytest.raises(SystemExit) as exc:
+        liftosaur.ok(302, None, "GET /settings")
+    message = str(exc.value)
+    assert "HTTP 302" in message
+    assert "redirect not followed" in message
+    assert "not JSON" not in message
+    assert "://" not in message
+    assert KEY not in message
+
+
+@pytest.mark.parametrize("missing", ["id", "name"])
+def test_program_push_exits_when_response_lacks_a_field(monkeypatch, tmp_path, missing):
+    f = tmp_path / "program.txt"
+    f.write_text("# Week 1")
+    fields = {"id": "p9", "name": "M1"}
+    del fields[missing]
+    monkeypatch.setattr(liftosaur, "call", lambda *a, **k: (200, {"data": fields}))
+    with pytest.raises(SystemExit) as exc:
+        liftosaur.cmd_program_push(argparse.Namespace(file=str(f), name="M1", id=None))
+    assert f"no '{missing}'" in str(exc.value)
+
+
+def test_importing_does_not_change_urllibs_global_opener():
+    installed = urllib.request._opener
+    assert installed is None or not any(
+        isinstance(h, liftosaur._NoRedirect) for h in installed.handlers)
 
 
 def test_redirects_are_refused_so_the_key_is_not_forwarded():
@@ -324,7 +360,7 @@ def test_call_sends_bearer_auth_and_json_body(monkeypatch):
         captured["body"] = json.loads(req.data)
         return FakeResponse()
 
-    monkeypatch.setattr(liftosaur.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(liftosaur._OPENER, "open", fake_urlopen)
     status, payload = liftosaur.call("POST", "/programs", body={"name": "M1", "text": "# Week 1"})
     assert status == 201
     assert payload["data"]["id"] == "p1"
@@ -354,7 +390,7 @@ def test_call_encodes_query_params(monkeypatch):
         captured["url"] = req.full_url
         return FakeResponse()
 
-    monkeypatch.setattr(liftosaur.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(liftosaur._OPENER, "open", fake_urlopen)
     liftosaur.call("GET", "/history", params={"limit": 200, "startDate": "2026-09-01"})
     assert "limit=200" in captured["url"]
     assert "startDate=2026-09-01" in captured["url"]
