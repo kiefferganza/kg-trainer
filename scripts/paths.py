@@ -42,7 +42,7 @@ def _locate() -> tuple[pathlib.Path, str]:
 
 
 def _warn_if_unignored(store: pathlib.Path) -> None:
-    """A store inside a git repo must be ignored — it can hold the hevy-key."""
+    """A store inside a git repo must be ignored — it can hold the liftosaur-key."""
     try:
         inside = subprocess.run(["git", "-C", str(store.parent), "rev-parse", "--is-inside-work-tree"],
                                 capture_output=True, text=True)

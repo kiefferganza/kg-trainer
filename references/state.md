@@ -8,23 +8,22 @@ Everything lives under one `kg-trainer-data/` directory, resolved once by `scrip
 
 So the store follows the project, not the machine, and running from a subdirectory reuses the project's store instead of starting an empty one. The scripts exit rather than resolve to a store inside the skill's own directory — only an explicit `$KG_TRAINER_HOME` can put it there.
 
-Inside a git repo the store must be ignored: it holds bodyweight history, plans and possibly the `hevy-key` file. The scripts print a warning on stderr when it is not; add `kg-trainer-data/` to that repo's `.gitignore` before writing anything.
+Inside a git repo the store must be ignored: it holds bodyweight history, plans and possibly the `liftosaur-key` file. The scripts print a warning on stderr when it is not; add `kg-trainer-data/` to that repo's `.gitignore` before writing anything.
 
 ```
 kg-trainer-data/
   profile.json               intake answers + current targets
-  hevy-key                   optional, chmod 600 — only if the user asks to save it
-  exercise-templates.jsonl   cached Hevy catalog (scripts/hevy.py catalog)
+  liftosaur-key              optional, chmod 600 — only if the user asks to save it
   weight-log.csv             date,weight_kg,fat_percent,waist_cm
   checkins.jsonl             one append-only record per weekly check-in
   data/
-    workouts.jsonl           every logged workout (scripts/analyze.py pull)
-    measurements.json        body measurements, merged on date
+    workouts.jsonl           every logged workout, parsed from Liftohistory (scripts/analyze.py pull)
+    measurements.json        bodyweight, one row per day, from Liftosaur's weight series
     sync.json                {"last_pull": ISO} — drives incremental pulls
     free-exercise-db.json    cached photo catalog for the dashboard
   plans/
     meso-01.md               the human-readable program
-    meso-01-routines/        the exact JSON pushed to Hevy, one file per session
+    meso-01.liftoscript      the exact program text pushed to Liftosaur
   dashboard/
     index.html  data.js  img/    generated; opens from disk, contains no API key
 ```
@@ -53,8 +52,8 @@ kg-trainer-data/
   ],
   "daily_activity": "desk job, ~7k steps",   // drives the TDEE multiplier
   "current_lifts": { "squat": "120x6", "bench": "80x8", "deadlift": "150x5" },
-  "hevy": { "connected": true, "key_source": "env", "folder_id": 42 },
-  "plan_output": ["markdown", "hevy"],
+  "liftosaur": { "connected": true, "key_source": "env", "program_id": "..." },
+  "plan_output": ["markdown", "liftosaur"],
   "targets": { "calories": 2800, "protein_g": 175, "carbs_g": 355, "fat_g": 75,
                "set_on": "2026-09-18", "basis": "observed_tdee" },
   "created": "2026-09-18",
@@ -63,7 +62,7 @@ kg-trainer-data/
 }
 ```
 
-Write it at the end of Phase 1 and update `targets`/`weight_kg`/`updated`/`last_checkin` at every check-in. `weight_kg` holds the current 7-day average, not the most recent single weigh-in — the raw readings live in `weight-log.csv`. `key_source` records *where* the key came from (`env` or `file`) — never store the key value in `profile.json`.
+Write it at the end of Phase 1 and update `targets`/`weight_kg`/`updated`/`last_checkin` at every check-in. `weight_kg` holds the current 7-day average, not the most recent single weigh-in — the raw readings live in `weight-log.csv`. `key_source` records *where* the key came from (`env`, `dotenv` or `file`) — never store the key value in `profile.json`.
 
 ## checkins.jsonl
 
@@ -81,4 +80,4 @@ Append only. Never rewrite a past record — a wrong past decision is data about
 
 ## API key handling
 
-Read the key from `$HEVY_API_KEY` first. Only write `kg-trainer-data/hevy-key` if the user explicitly asks to save it, and then `chmod 600` it immediately and confirm `kg-trainer-data/` is gitignored — the store now sits inside the working directory, so an unignored key file is one `git add .` away from a commit. Never echo the key back, never paste it into a plan file, a markdown document, a commit, or an external app. When a key fails, report the HTTP status, not the key.
+The REST API requires a Liftosaur premium subscription; a 401 from an otherwise correct key usually means it has lapsed. `scripts/liftosaur.py` reads the key from `$LIFTOSAUR_API_KEY` first, then from the nearest `.env` (searching the working directory and its parents), then from `kg-trainer-data/liftosaur-key`. Only write `kg-trainer-data/liftosaur-key` if the user explicitly asks to save it, and then `chmod 600` it immediately and confirm `kg-trainer-data/` is gitignored — the store now sits inside the working directory, so an unignored key file is one `git add .` away from a commit. Never echo the key back, never paste it into a plan file, a markdown document, a commit, or an external app. When a key fails, report the HTTP status, not the key.

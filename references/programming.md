@@ -62,7 +62,7 @@ State the per-muscle weekly total in the plan file and say which range it sits i
 - **Weekly shape:** one long session, one to two quality sessions (intervals or threshold), the rest easy. Never two quality sessions back to back.
 - **Volume progression:** raise weekly volume ~10% at most, then hold or cut. Three build weeks to one recovery week (−30–40% volume).
 - **Strength support:** 2 short sessions/wk, heavy and low-volume (3–5 sets, 3–6 reps), on the same day as a hard endurance session rather than on an easy day, to protect recovery days.
-- **Hevy fit:** Hevy is a lifting log. Cardio maps onto `distance_duration` exercise types and loses pace/HR detail. Push the strength sessions to Hevy and keep the endurance prescription in the markdown plan.
+- **Liftosaur fit:** Liftosaur is a lifting log. Timed work fits as timed sets (`Plank / 3x1 60s`), but pace and heart-rate targets have nowhere to live. Push the strength sessions to Liftosaur and keep the endurance prescription in the markdown plan.
 
 ## Hybrid / concurrent
 

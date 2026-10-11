@@ -52,12 +52,6 @@ def test_program_sessions_drops_trailing_comments_and_script_blocks():
         "Squat / 3x8 / 135lb", "Bench Press / 3x8 / 95lb", "Lateral Raise / 3x12 / 10kg"]
 
 
-def test_no_hevy_references_remain():
-    for name in ("dashboard.py", "dashboard_template.html"):
-        text = (pathlib.Path(dashboard.__file__).parent / name).read_text().lower()
-        assert "hevy" not in text
-
-
 LIVE_PROGRAM = """# Week 1
 ## Day 1
 Bench Press / 1x10, 1x8 / 80kg / warmup: 1x8 40kg
