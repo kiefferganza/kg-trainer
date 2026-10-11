@@ -113,7 +113,7 @@ Only after approval.
 
 1. **Check every exercise name** against the built-ins: `scripts/liftosaur.py exercises "<pattern>"`. Liftosaur names carry equipment as a suffix (`Bicep Curl, Cable`). Show a table of plan exercise → Liftosaur name. No match means say so and propose a custom exercise created in the app.
 2. **Verify the volume before pushing:** `scripts/liftosaur.py program-stats plan.liftoscript`. Liftosaur computes the per-day content and the weekly set totals per muscle group. Compare those against the volume landmarks in references/programming.md and report the real numbers.
-3. **Simulate it:** `scripts/liftosaur.py playground plan.liftoscript --week 1 --day 1`. A program that will not resolve is a program they cannot run. A 422 means invalid Liftoscript; fix it and run `program-stats` again.
+3. **Simulate it:** `scripts/liftosaur.py playground plan.liftoscript --week 1 --day 1 --command "complete_set(1, 1)" --command "complete_set(2, 1)" ...`, one `complete_set(<exercise>, 1)` per exercise in the day. The result lists only completed sets, each with its `target:`, so with no commands it is a parse check that returns an empty workout. A 422 means invalid Liftoscript; fix it and run `program-stats` again. Add `--command "finish_workout()"` to see the progression applied in the returned `updatedProgramText`.
 4. **Push it:** `scripts/liftosaur.py program-push plan.liftoscript --name "<name>"`, and report the returned id. Record it as `liftosaur.program_id` in `profile.json`.
 5. **Verify:** `scripts/liftosaur.py programs` and confirm it is there. Then: "Open Liftosaur and the program is in your list."
 
@@ -160,7 +160,7 @@ The colour ramp is one hue and runs **dark → light as values rise**, because t
 | Baseline tables | `scripts/analyze.py report` |
 | One lift in depth | `scripts/analyze.py deep-dive "squat"` |
 | Check a program's volume | `scripts/liftosaur.py program-stats plan.liftoscript` |
-| Simulate a program | `scripts/liftosaur.py playground plan.liftoscript --week 1 --day 1` |
+| Simulate a program | `scripts/liftosaur.py playground plan.liftoscript --week 1 --day 1 --command "complete_set(1, 1)"` |
 | Create a program | `scripts/liftosaur.py program-push plan.liftoscript --name "Meso 1"` |
 | Update a program | `scripts/liftosaur.py program-push plan.liftoscript --id <id>` |
 | Fetch a program to edit | `scripts/liftosaur.py program-get current --out plan.liftoscript` |

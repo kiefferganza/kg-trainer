@@ -4,6 +4,7 @@ import email.message
 import io
 import json
 import pathlib
+import sys
 import threading
 import urllib.error
 import urllib.request
@@ -524,3 +525,33 @@ def test_weigh_in_converts_pounds():
 ])
 def test_weigh_in_refuses_what_it_cannot_read(entry):
     assert liftosaur.weigh_in(entry) is None
+
+
+def test_playground_passes_commands_through_in_order(monkeypatch, tmp_path, capsys):
+    plan = tmp_path / "plan.liftoscript"
+    plan.write_text("# Week 1\n## Day 1\nSquat / 3x5 / 100kg\n")
+    sent = {}
+
+    def fake_call(method, path, params=None, body=None):
+        sent.update(body)
+        return 200, {"data": {"workout": "..."}}
+
+    monkeypatch.setattr(liftosaur, "call", fake_call)
+    monkeypatch.setattr(sys, "argv", ["liftosaur.py", "playground", str(plan), "--week", "2",
+                                      "--command", "complete_set(1, 1)",
+                                      "--command", "finish_workout()"])
+    liftosaur.main()
+    assert sent["commands"] == ["complete_set(1, 1)", "finish_workout()"]
+    assert sent["week"] == 2
+
+
+def test_playground_without_commands_sends_none(monkeypatch, tmp_path):
+    plan = tmp_path / "plan.liftoscript"
+    plan.write_text("# Week 1\n## Day 1\nSquat / 3x5 / 100kg\n")
+    sent = {}
+    monkeypatch.setattr(liftosaur, "call",
+                        lambda method, path, params=None, body=None: (sent.update(body) or
+                                                                      (200, {"data": {}})))
+    monkeypatch.setattr(sys, "argv", ["liftosaur.py", "playground", str(plan)])
+    liftosaur.main()
+    assert "commands" not in sent

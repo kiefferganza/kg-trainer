@@ -159,7 +159,9 @@ programs                                  your programs
 program-get <id|current> [--out FILE]     fetch a program's Liftoscript
 program-push <file> [--name NAME] [--id]  create (POST) or replace (PUT) a program
 program-stats <file>                      per-day content and weekly sets per muscle
-playground <file> [--week N] [--day N]    resolve one day of a program
+playground <file> [--week N] [--day N] [--command CMD ...]
+                                          simulate one day; it lists completed sets only,
+                                          so pass complete_set(ex, set) to see targets
 ```
 
 ### `scripts/analyze.py` — history and baseline
@@ -270,7 +272,7 @@ database. The fix is a more standard exercise name, not a nearly-right photo.
 - **A program is one document.** A block is a single Liftoscript program with every week and day
   written out, and progression rules (`lp`, `dp`, `sum`, `custom`) that the app applies itself.
 - **The server does the counting.** `program-stats` reports weekly sets per muscle and
-  `playground` resolves a day, so a program is checked before it is pushed.
+  `playground` simulates a day (completing sets you name), so a program is checked before it is pushed.
 - **Weigh-ins carry their unit** (`69.9kg`, `154lb`). A value with no unit is skipped rather than
   assumed, and each weigh-in is dated in your local time zone.
 

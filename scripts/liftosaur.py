@@ -12,7 +12,10 @@ Usage:
   liftosaur.py program-get <id|current> [--out FILE]
   liftosaur.py program-push <file> [--name NAME] [--id ID]
   liftosaur.py program-stats <file>
-  liftosaur.py playground <file> [--week N] [--day N]
+  liftosaur.py playground <file> [--week N] [--day N] [--command CMD ...]
+                                           # no commands: parse check only; the
+                                           # workout lists completed sets, so pass
+                                           # complete_set(ex, set) to see targets
 
 The key is read from $LIFTOSAUR_API_KEY, else from a .env file in the project
 directory, else from <state>/liftosaur-key. It is never printed, and a failure
@@ -311,6 +314,8 @@ def cmd_playground(a):
         body["week"] = a.week
     if a.day:
         body["day"] = a.day
+    if a.command:
+        body["commands"] = a.command
     print(json.dumps(ok(*call("POST", "/playground", body=body), "POST /playground"), indent=2))
 
 
@@ -335,6 +340,8 @@ def main():
     c = sub.add_parser("program-stats"); c.add_argument("file"); c.set_defaults(fn=cmd_program_stats)
     c = sub.add_parser("playground"); c.add_argument("file")
     c.add_argument("--week", type=int); c.add_argument("--day", type=int)
+    c.add_argument("--command", action="append",
+                   help="simulated action, repeatable: complete_set(1, 1), finish_workout()")
     c.set_defaults(fn=cmd_playground)
 
     args = parser.parse_args()
