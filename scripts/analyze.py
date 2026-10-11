@@ -227,9 +227,9 @@ def build_report(ws: list[dict], muscles: dict) -> dict:
         "push_sets": push, "pull_sets": pull,
         "push_pull_ratio": round(push / pull, 2) if pull else None,
         "push_pull_flag": bool(pull and push / pull > 1.5),
-        # An entry here is an exercise with no row in exercise-muscles.json, so
-        # its sets are counted under "unknown" and every muscle it trains is
-        # undercounted. The fix is to add it to the map, not to adjust the table.
+        # An entry here is an exercise with no row in either muscle map, so its
+        # sets are counted under "unknown" and every muscle it trains is
+        # undercounted. The fix is to add it to a map, not to adjust the table.
         "unclassified_exercises": dict(sorted(vague.items(), key=lambda x: -x[1])),
     }
 
@@ -291,11 +291,11 @@ def fmt(rep: dict) -> str:
               + ("  ⚠ above 1.5:1" if b["push_pull_flag"] else ""), ""]
     if b["unclassified_exercises"]:
         tot = sum(b["unclassified_exercises"].values())
-        L += [f"{tot} of those sets are from exercises missing from "
-              f"references/exercise-muscles.json, so the table above undercounts "
-              f"whatever they really train:", ""]
+        L += [f"{tot} of those sets are from exercises with no muscle mapping, so the "
+              f"table above undercounts whatever they really train:", ""]
         L += [f"- {k} — {v} sets" for k, v in list(b["unclassified_exercises"].items())[:12]]
-        L += [""]
+        L += ["", f"Map custom exercises in {PERSONAL_MUSCLE_MAP}, "
+                  f'e.g. {{"bayesian curl": "biceps"}}.', ""]
     r = rep["rpe"]
     L += ["### RPE", "",
           r.get("note") or (f"Average top-set RPE over the last 8 weeks: "

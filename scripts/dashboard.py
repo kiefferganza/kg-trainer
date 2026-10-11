@@ -247,7 +247,7 @@ def build(a):
     if bal["unclassified_exercises"]:
         tot = sum(bal["unclassified_exercises"].values())
         top = ", ".join(list(bal["unclassified_exercises"])[:4])
-        note += (f" {tot} sets are from exercises missing from exercise-muscles.json"
+        note += (f" {tot} sets are from exercises with no muscle mapping"
                  f" ({top}…), so these counts understate whatever those really train.")
 
     # --- PRs

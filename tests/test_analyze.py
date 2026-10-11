@@ -160,3 +160,9 @@ def test_personal_muscle_map_refuses_values_outside_the_vocabulary(tmp_path, mon
     with pytest.raises(SystemExit) as exc:
         analyze.load_muscles()
     assert str(personal) in str(exc.value)
+
+
+def test_report_points_unmapped_exercises_at_the_personal_map(workouts):
+    text = analyze.fmt(analyze.build_report(workouts, MUSCLES))
+    assert "Mystery Machine — 2 sets" in text
+    assert str(analyze.PERSONAL_MUSCLE_MAP) in text

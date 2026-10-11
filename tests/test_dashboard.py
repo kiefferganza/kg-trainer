@@ -83,7 +83,7 @@ def test_build_renders_liftohistory_workouts_and_the_current_program(tmp_path, m
     assert bench["last"] == "last did 82.5 kg × 8 on 2026-09-08"
     assert mystery["last"] == "last did 30 kg × 12 on 2026-09-01"
     assert [c["exercise"] for c in data["e1rm"]] == ["Bench Press", "Lat Pulldown, Cable"]
-    assert "exercise-muscles.json" in data["muscleNote"]
+    assert "no muscle mapping (Mystery Machine" in data["muscleNote"]
 
 
 def test_build_survives_an_unreachable_program(tmp_path, monkeypatch):
