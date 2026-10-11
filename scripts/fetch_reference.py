@@ -10,10 +10,12 @@ Usage:
   fetch_reference.py --check         # fail if a vendored file is out of date
   fetch_reference.py --fedb PATH     # seed muscles from a local free-exercise-db JSON
 
-Without --fedb the free-exercise-db is downloaded and cached at FEDB_CACHE.
+Without --fedb the free-exercise-db is downloaded to a temporary file for that run
+and deleted afterwards; nothing is cached.
 Muscle assignments already present in references/exercise-muscles.json are
 kept, so hand-mapped entries survive a re-run; only new exercises are seeded,
-and any left 'unknown' are listed for hand-mapping.
+and any exercise that cannot be matched is left out of the map and listed for
+hand-mapping (the map never stores 'unknown').
 """
 
 from __future__ import annotations
@@ -22,13 +24,12 @@ import argparse
 import json
 import pathlib
 import sys
+import tempfile
 import urllib.request
 
 MCP = "https://www.liftosaur.com/mcp"
 FEDB_URL = "https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/dist/exercises.json"
 REFS = pathlib.Path(__file__).resolve().parent.parent / "references"
-FEDB_CACHE = (pathlib.Path(__file__).resolve().parent.parent / ".superpowers" / "sdd"
-              / "2026-10-11-liftosaur-migration" / "free-exercise-db.json")
 
 TOOLS = {
     "exercises.txt": "list_exercises",
@@ -59,10 +60,25 @@ def mcp_tool(name: str) -> str:
         "Content-Type": "application/json",
         "Accept": "application/json, text/event-stream"})
     with urllib.request.urlopen(req, timeout=90) as response:
-        payload = json.loads(response.read())
+        raw = response.read()
+    try:
+        payload = json.loads(raw)
+    except ValueError:
+        sys.exit(f"{name} failed: response was not JSON (got {raw[:80]!r}); "
+                 "the server may have answered with an event stream")
+    if not isinstance(payload, dict):
+        sys.exit(f"{name} failed: unexpected response shape")
     if "error" in payload:
         sys.exit(f"{name} failed: {payload['error']}")
-    return payload["result"]["content"][0]["text"]
+    result = payload.get("result")
+    content = result.get("content") if isinstance(result, dict) else None
+    first = content[0] if isinstance(content, list) and content else None
+    text = first.get("text") if isinstance(first, dict) else None
+    if isinstance(result, dict) and result.get("isError"):
+        sys.exit(f"{name} failed at the tool level: {text}")
+    if not isinstance(text, str) or not text.strip():
+        sys.exit(f"{name} failed: response carried no text content")
+    return text
 
 
 def normalise(title: str) -> str:
@@ -90,17 +106,20 @@ def exercise_names(text: str) -> list[str]:
 
 
 def load_fedb(path: pathlib.Path | None) -> list:
-    if path is None:
-        path = FEDB_CACHE
-        if not path.exists():
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with urllib.request.urlopen(FEDB_URL, timeout=90) as response:
-                path.write_bytes(response.read())
-    return json.loads(path.read_text())
+    """Read the free-exercise-db from PATH, or download it to a temp file for this run."""
+    if path is not None:
+        return json.loads(path.read_text())
+    with tempfile.TemporaryDirectory() as tmp:
+        target = pathlib.Path(tmp) / "exercises.json"
+        with urllib.request.urlopen(FEDB_URL, timeout=90) as response:
+            target.write_bytes(response.read())
+        return json.loads(target.read_text())
 
 
 def build_muscle_map(names: list[str], fedb: list, existing: dict | None = None) -> dict:
-    """Seed the map from free-exercise-db primaryMuscles; keep prior valid entries."""
+    """Seed the map from free-exercise-db primaryMuscles; keep prior valid entries.
+
+    Names that cannot be matched are omitted, never stored as 'unknown'."""
     existing = existing or {}
     by_name = {}
     for entry in fedb:
@@ -114,7 +133,9 @@ def build_muscle_map(names: list[str], fedb: list, existing: dict | None = None)
             continue
         key = normalise(name)
         base = normalise(name.split(",")[0])
-        out[name] = by_name.get(key) or by_name.get(base) or "unknown"
+        seeded = by_name.get(key) or by_name.get(base)
+        if seeded:
+            out[name] = seeded
     return out
 
 
@@ -125,35 +146,34 @@ def main():
     args = parser.parse_args()
 
     REFS.mkdir(parents=True, exist_ok=True)
-    stale = []
+    fetched = {}
     for filename, tool in TOOLS.items():
-        text = mcp_tool(tool)
-        target = REFS / filename
-        if args.check:
-            if not target.exists() or target.read_text() != text:
-                stale.append(filename)
-            continue
-        target.write_text(text)
-        print(f"wrote {target.relative_to(REFS.parent)}  ({len(text)} chars)")
+        fetched[filename] = mcp_tool(tool)  # fetch everything before writing anything
 
     if args.check:
+        stale = [f for f, text in fetched.items()
+                 if not (REFS / f).exists() or (REFS / f).read_text() != text]
         if stale:
             sys.exit("stale vendored references: " + ", ".join(stale))
         print("vendored references are current")
         return
 
-    names = exercise_names((REFS / "exercises.txt").read_text())
+    for filename, text in fetched.items():
+        (REFS / filename).write_text(text)
+        print(f"wrote references/{filename}  ({len(text)} chars)")
+
+    names = exercise_names(fetched["exercises.txt"])
     muscles_path = REFS / "exercise-muscles.json"
     existing = json.loads(muscles_path.read_text()) if muscles_path.exists() else {}
     table = build_muscle_map(names, load_fedb(args.fedb), existing)
-    unknown = sorted(k for k, v in table.items() if v == "unknown")
+    unmatched = sorted(n for n in names if n not in table)
     muscles_path.write_text(json.dumps(table, indent=2, sort_keys=True) + "\n")
-    print(f"wrote references/exercise-muscles.json  ({len(table)} exercises, "
-          f"{len(unknown)} unknown)")
-    if unknown:
-        print("unmapped -- assign these by hand before trusting the balance table:")
-        for name in unknown:
+    print(f"wrote references/exercise-muscles.json  ({len(table)} of {len(names)} exercises)")
+    if unmatched:
+        print("unmapped -- add these to the map by hand before trusting the balance table:")
+        for name in unmatched:
             print(f"  {name}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
