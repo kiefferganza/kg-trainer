@@ -14,6 +14,7 @@ Inside a git repo the store must be ignored: it holds bodyweight history, plans 
 kg-trainer-data/
   profile.json               intake answers + current targets
   liftosaur-key              optional, chmod 600 — only if the user asks to save it
+  exercise-muscles.json      optional — the user's custom exercises -> primary muscle, layered over references/exercise-muscles.json
   weight-log.csv             date,weight_kg,fat_percent,waist_cm
   checkins.jsonl             one append-only record per weekly check-in
   data/

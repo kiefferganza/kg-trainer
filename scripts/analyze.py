@@ -28,7 +28,7 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import liftosaur  # noqa: E402  — reuse the one API client
 import paths  # noqa: E402
-from fetch_reference import muscle_for  # noqa: E402
+from fetch_reference import MUSCLES, muscle_for  # noqa: E402
 from liftohistory import parse_liftohistory  # noqa: E402
 
 STATE = paths.state_dir()
@@ -37,6 +37,9 @@ WORKOUTS = DATA / "workouts.jsonl"
 MEASUREMENTS = DATA / "measurements.json"
 SYNC = DATA / "sync.json"
 MUSCLE_MAP = pathlib.Path(__file__).resolve().parent.parent / "references" / "exercise-muscles.json"
+# The user's own custom exercises. It lives in the store, not the skill, because
+# the names are personal and fetch_reference.py rewrites the shipped map.
+PERSONAL_MUSCLE_MAP = STATE / "exercise-muscles.json"
 
 # Muscle groups that a push/pull ratio is computed over. Legs, core and
 # everything else are deliberately excluded — they belong to neither side.
@@ -60,9 +63,19 @@ def load_workouts() -> list[dict]:
 
 
 def load_muscles() -> dict[str, str]:
+    """The shipped built-in map, with the personal map's entries layered on top."""
     if not MUSCLE_MAP.exists():
         sys.exit(f"No muscle map at {MUSCLE_MAP}. Run: scripts/fetch_reference.py")
-    return json.loads(MUSCLE_MAP.read_text())
+    table = json.loads(MUSCLE_MAP.read_text())
+    if PERSONAL_MUSCLE_MAP.exists():
+        personal = json.loads(PERSONAL_MUSCLE_MAP.read_text())
+        bad = (sorted(f"{k}: {v}" for k, v in personal.items() if v not in MUSCLES)
+               if isinstance(personal, dict) else ["not a JSON object"])
+        if bad:
+            sys.exit(f"{PERSONAL_MUSCLE_MAP} has entries outside the muscle vocabulary "
+                     f"({', '.join(bad)}). Use one of: {', '.join(MUSCLES)}")
+        table.update(personal)
+    return table
 
 
 def save_workouts(ws: list[dict]):

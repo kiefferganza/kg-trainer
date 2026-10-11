@@ -125,3 +125,38 @@ def test_deep_dive_reads_every_logged_set_from_the_local_log(workouts, capsys):
 def test_deep_dive_with_no_match_exits(workouts):
     with pytest.raises(SystemExit):
         analyze.deep_dive(workouts, "squat")
+
+
+def test_personal_muscle_map_overrides_and_extends_the_shipped_one(tmp_path, monkeypatch):
+    shipped = tmp_path / "shipped.json"
+    shipped.write_text(json.dumps({"Bench Press": "chest", "Pullover": "lats"}))
+    personal = tmp_path / "exercise-muscles.json"
+    personal.write_text(json.dumps({"bayesian curl": "biceps", "Pullover": "chest"}))
+    monkeypatch.setattr(analyze, "MUSCLE_MAP", shipped)
+    monkeypatch.setattr(analyze, "PERSONAL_MUSCLE_MAP", personal)
+
+    assert analyze.load_muscles() == {"Bench Press": "chest", "Pullover": "chest",
+                                      "bayesian curl": "biceps"}
+
+
+def test_personal_muscle_map_is_optional(tmp_path, monkeypatch):
+    shipped = tmp_path / "shipped.json"
+    shipped.write_text(json.dumps({"Bench Press": "chest"}))
+    monkeypatch.setattr(analyze, "MUSCLE_MAP", shipped)
+    monkeypatch.setattr(analyze, "PERSONAL_MUSCLE_MAP", tmp_path / "absent.json")
+
+    assert analyze.load_muscles() == {"Bench Press": "chest"}
+
+
+@pytest.mark.parametrize("bad", [{"Treadmill": "cardio"}, {"X": "unknown"}, ["not", "a", "map"]])
+def test_personal_muscle_map_refuses_values_outside_the_vocabulary(tmp_path, monkeypatch, bad):
+    shipped = tmp_path / "shipped.json"
+    shipped.write_text(json.dumps({"Bench Press": "chest"}))
+    personal = tmp_path / "exercise-muscles.json"
+    personal.write_text(json.dumps(bad))
+    monkeypatch.setattr(analyze, "MUSCLE_MAP", shipped)
+    monkeypatch.setattr(analyze, "PERSONAL_MUSCLE_MAP", personal)
+
+    with pytest.raises(SystemExit) as exc:
+        analyze.load_muscles()
+    assert str(personal) in str(exc.value)

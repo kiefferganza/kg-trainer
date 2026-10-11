@@ -250,7 +250,9 @@ windows to your most recent weigh-in, so sparse weighing fails the 7-day window.
 
 **The balance table has an `unknown` row** — check `unclassified_exercises` in the report. Those
 exercises, usually custom ones, have no row in `references/exercise-muscles.json`, so their sets
-cannot be attributed to a muscle and the table undercounts whatever they train.
+cannot be attributed to a muscle and the table undercounts whatever they train. Map them in
+`kg-trainer-data/exercise-muscles.json`, e.g. `{"bayesian curl": "biceps"}`, using one of the
+muscle names the report already shows; it is layered over the built-in map.
 
 **An edited or deleted workout still shows** — an incremental `pull` only asks for new workouts.
 Run `pull --full` to re-read everything.
