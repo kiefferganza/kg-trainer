@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a static training dashboard from the cached Hevy log.
+"""Generate a static training dashboard from the cached Liftosaur log.
 
 Writes kg-trainer-data/dashboard/{index.html,data.js,img/*}. It opens straight
 from the filesystem — no server, and no API key ever reaches the output.
@@ -25,7 +25,7 @@ import urllib.request
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import analyze  # noqa: E402
-import hevy  # noqa: E402
+import liftosaur  # noqa: E402
 import paths  # noqa: E402
 
 STATE = paths.state_dir()
@@ -102,25 +102,46 @@ def kg(v) -> str:
     return f"{v:g}"
 
 
-def rx_of(ex: dict) -> str:
-    """Human prescription line for one routine exercise."""
-    work = [s for s in ex.get("sets", []) if s.get("type") != "warmup"]
-    if not work:
-        return "—"
-    r = work[0].get("rep_range")
-    reps = f"{r['start']}–{r['end']}" if r and r.get("start") else (
-        str(work[0].get("reps")) if work[0].get("reps") else
-        (f"{work[0]['duration_seconds']}s" if work[0].get("duration_seconds") else "?"))
-    load = work[0].get("weight_kg")
-    return f"{len(work)} × {reps}" + (f" @ {kg(load)} kg" if load else "")
+_DROPPED_SECTIONS = ("progress:", "update:", "warmup:", "used:", "id:", "superset:")
+
+
+def program_sessions(program_text: str) -> list[dict]:
+    """Split a Liftoscript program into its weeks and days for the plan tabs.
+
+    '#' prefixes a week, '##' a day, '//' a comment, and '///' starts a trailing
+    comment. Everything else is an exercise line; the sections after the sets
+    are dropped, and so are the lines of a multi-line {~ ~} script block, so the
+    tab stays readable at the rack.
+    """
+    sessions: list[dict] = []
+    week = ""
+    in_script = False
+    for raw in program_text.splitlines():
+        line = raw.split("///", 1)[0].strip()
+        if in_script:
+            in_script = "~}" not in line
+            continue
+        if "{~" in line and "~}" not in line.split("{~", 1)[1]:
+            in_script = True
+            line = line.split("{~", 1)[0].strip()
+        if not line or line.startswith("//"):
+            continue
+        if line.startswith("## "):
+            sessions.append({"week": week, "day": line[3:].strip(), "exercises": []})
+        elif line.startswith("# "):
+            week = line[2:].strip()
+        elif sessions:
+            parts = [p.strip() for p in line.split("/")]
+            keep = [parts[0]] + [p for p in parts[1:] if not p.startswith(_DROPPED_SECTIONS)]
+            sessions[-1]["exercises"].append(" / ".join(p for p in keep if p))
+    return sessions
 
 
 def build(a):
     ws = analyze.load_workouts()
     if not ws:
         sys.exit("No cached workouts. Run: analyze.py pull --full")
-    cat = analyze.load_catalog()
-    rep = analyze.build_report(ws, cat)
+    rep = analyze.build_report(ws, analyze.load_muscles())
     fedb = load_fedb()
     icache: dict[str, list[str]] = {}
     imgs = lambda t: fetch_images(t, fedb, not a.no_images, icache)  # noqa: E731
@@ -134,8 +155,9 @@ def build(a):
     d30 = now - dt.timedelta(days=30)
 
     # --- tiles
-    secs = sum((analyze.parse_ts(w["end_time"]) - analyze.parse_ts(w["start_time"])).total_seconds()
-               for w in ws)
+    # Liftohistory records a duration only when the session was timed.
+    timed = [w for w in ws if w.get("duration_seconds")]
+    secs = sum(w["duration_seconds"] for w in timed)
     vol = sum((s.get("weight_kg") or 0) * (s.get("reps") or 0)
               for _, _, s in analyze.working_sets(ws))
     this_year = [w for w in ws if w["start_time"][:4] == str(now.year)]
@@ -148,9 +170,12 @@ def build(a):
         {"label": "Last 30 days", "value": str(len(last30)),
          "tip": f"<b>{len(last30)}</b> workouts since {d30.date()}"
                 f"<br>{rep['frequency']['sessions_per_week']}/week over 12 weeks"},
-        {"label": "Hours under the bar", "value": str(round(secs / 3600)),
-         "tip": f"<b>{secs/3600:,.1f}</b> hours across {len(ws)} sessions"
-                f"<br>average {secs/60/len(ws):.0f} min per session"},
+        {"label": "Hours under the bar", "value": str(round(secs / 3600)) if timed else "—",
+         "tip": (f"<b>{secs/3600:,.1f}</b> hours across {len(timed)} timed sessions"
+                 f"<br>average {secs/60/len(timed):.0f} min per session"
+                 + (f"<br>{len(ws) - len(timed)} sessions have no recorded duration"
+                    if len(timed) < len(ws) else ""))
+                if timed else "No session has a recorded duration"},
         {"label": "Total volume", "value": f"{vol/1000:,.0f}t",
          "tip": f"<b>{vol:,.0f} kg</b> lifted (weight × reps, warmups excluded)"},
     ]
@@ -164,13 +189,13 @@ def build(a):
         d = analyze.parse_ts(w["start_time"]).date()
         if d < start:
             continue
-        mins = (analyze.parse_ts(w["end_time"]) - analyze.parse_ts(w["start_time"])).total_seconds() / 60
+        mins = (w.get("duration_seconds") or 0) / 60
         sets = sum(1 for e in w.get("exercises", []) for s in e.get("sets", [])
                    if s.get("type") != "warmup")
         rec = per_day.setdefault(d, {"minutes": 0, "sets": 0, "titles": []})
         rec["minutes"] += round(mins)
         rec["sets"] += sets
-        rec["titles"].append(w["title"])
+        rec["titles"].append(w.get("day_name") or w.get("program") or "Workout")
     days = []
     d = start
     while d <= end:
@@ -183,13 +208,12 @@ def build(a):
     # --- estimated 1RM series for the lifts with the most working sets
     counts: dict[str, int] = {}
     for _, e, _ in analyze.working_sets(ws):
-        counts[e["exercise_template_id"]] = counts.get(e["exercise_template_id"], 0) + 1
+        counts[e["title"]] = counts.get(e["title"], 0) + 1
     e1rm = []
-    for tid in sorted(counts, key=counts.get, reverse=True)[:6]:
-        title = cat.get(tid, {}).get("title", tid)
+    for title in sorted(counts, key=counts.get, reverse=True)[:6]:
         by_day: dict[str, tuple[float, dict]] = {}
         for w, e, s in analyze.working_sets(ws):
-            if e["exercise_template_id"] != tid:
+            if e["title"] != title:
                 continue
             v = analyze.epley(s.get("weight_kg"), s.get("reps"))
             if not v:
@@ -223,8 +247,8 @@ def build(a):
     if bal["unclassified_exercises"]:
         tot = sum(bal["unclassified_exercises"].values())
         top = ", ".join(list(bal["unclassified_exercises"])[:4])
-        note += (f" {tot} sets sit in Hevy's catch-all groups ({top}…), so these"
-                 f" counts understate whatever those really train.")
+        note += (f" {tot} sets are from exercises missing from exercise-muscles.json"
+                 f" ({top}…), so these counts understate whatever those really train.")
 
     # --- PRs
     prs = [{"exercise": b["exercise"], "set": b["heaviest_set"], "e1rm": b["best_e1rm_kg"],
@@ -243,10 +267,12 @@ def build(a):
                 "caption": f"estimated 1RM · {top['exercise']} · {top['date']}",
                 "images": imgs(top["exercise"])}
 
-    # --- the plan, from live routines
+    # --- the plan, from the current Liftosaur program
     routines = []
     try:
-        live = hevy.paginate("/v1/routines", "routines", 10, None)
+        program = liftosaur.ok(*liftosaur.call("GET", "/programs/current"),
+                               "GET /programs/current")
+        live = program_sessions((program or {}).get("text") or "")
     except SystemExit:
         live = []
     last_lift: dict[str, tuple[str, dict]] = {}
@@ -254,24 +280,22 @@ def build(a):
         for e in w.get("exercises", []):
             for s in e.get("sets", []):
                 if s.get("type") != "warmup" and s.get("weight_kg"):
-                    last_lift[e["exercise_template_id"]] = (w["start_time"][:10], s)
-    for r in live:
+                    last_lift[e["title"]] = (w["start_time"][:10], s)
+    for session in live:
         exs = []
-        for e in r.get("exercises", []):
-            tid = e.get("exercise_template_id")
-            title = e.get("title") or cat.get(tid, {}).get("title", tid)
-            prev = last_lift.get(tid)
+        for line in session["exercises"]:
+            title, _, rx = (p.strip() for p in line.partition(" / "))
+            prev = last_lift.get(title)
             exs.append({
-                "name": title, "rx": rx_of(e),
+                "name": title, "rx": rx or "—",
                 "last": (f"last did {kg(prev[1]['weight_kg'])} kg × {prev[1].get('reps') or '?'}"
                          f" on {prev[0]}") if prev else "no logged history",
-                "cue": (e.get("notes") or "").strip(),
+                "cue": "",
                 "images": imgs(title),
-                "tip": f"<b>{title}</b><br>{rx_of(e)}"
-                       + (f"<br>rest {e['rest_seconds']}s" if e.get("rest_seconds") else "")
-                       + (f"<br>{e['notes']}" if e.get("notes") else ""),
+                "tip": f"<b>{title}</b><br>{rx or '—'}",
             })
-        routines.append({"title": r["title"], "exercises": exs})
+        heading = " · ".join(x for x in (session["week"], session["day"]) if x)
+        routines.append({"title": heading, "exercises": exs})
 
     data = {
         "name": a.name or profile.get("name") or "Athlete",
@@ -289,7 +313,7 @@ def build(a):
     (OUT / "index.html").write_text(html)
     n_img = len(list(IMG.glob("*.jpg"))) if IMG.exists() else 0
     print(f"built {OUT}/index.html\n"
-          f"  {len(ws)} workouts · {len(routines)} routines · {len(e1rm)} lift charts · "
+          f"  {len(ws)} workouts · {len(routines)} program days · {len(e1rm)} lift charts · "
           f"{len(days)} days · {n_img} photos")
     matched = sum(1 for v in icache.values() if v)
     print(f"  photos matched for {matched}/{len(icache)} exercises "

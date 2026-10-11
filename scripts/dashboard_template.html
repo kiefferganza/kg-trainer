@@ -225,7 +225,7 @@ if(D.routines.length){
   drawPlan(0);
 } else {
   document.getElementById('planH').style.display='none';
-  cards.append(el('p',{class:'note'},['No routines in Hevy yet — build a plan and push it.']));
+  cards.append(el('p',{class:'note'},['No current program in Liftosaur yet — build a plan and push it.']));
 }
 
 /* ---------- consistency heatmap ---------- */
@@ -310,7 +310,7 @@ for(const s of D.e1rm){
 })();
 
 document.getElementById('stamp').textContent =
-  `${D.workoutCount} workouts logged ${D.span}. Built ${D.built} from your Hevy log. Every number here comes from a logged set.`;
+  `${D.workoutCount} workouts logged ${D.span}. Built ${D.built} from your Liftosaur log. Every number here comes from a logged set.`;
 </script>
 </body>
 </html>
