@@ -1,8 +1,13 @@
 # Personal state lives in the user's project (see scripts/paths.py), and the
 # scripts refuse to create it here. This is a backstop for a manual copy.
 kg-trainer-data/
+liftosaur-key
 preview
 .claude/
 __pycache__/
 *.pyc
 .DS_Store
+.superpowers/
+.env
+.env.*
+!.env.example

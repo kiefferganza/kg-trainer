@@ -1,0 +1,10 @@
+2026-09-01T09:00:00Z / program: "M1" / dayName: "Upper A" / week: 1 / dayInWeek: 1 / exercises: {
+  Bench Press / 3x8 80kg @8+ / warmup: 1x10 40kg
+  Lat Pulldown, Cable / 3x10 50kg @7+
+  Mystery Machine / 2x12 30kg
+}
+
+2026-09-08T09:00:00Z / program: "M1" / dayName: "Upper A" / week: 2 / dayInWeek: 1 / exercises: {
+  Bench Press / 3x8 82.5kg @9+ / warmup: 1x10 40kg
+  Lat Pulldown, Cable / 3x10 52.5kg @8
+}

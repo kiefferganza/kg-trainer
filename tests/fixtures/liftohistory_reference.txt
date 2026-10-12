@@ -1,0 +1,8 @@
+// Optional workout note
+2026-02-28T10:45:30Z / program: "5/3/1 For Beginners" / dayName: "Push Day" / week: 1 / dayInWeek: 5 / duration: 1235s / exercises: {
+  // Optional exercise note
+  Bench Press, Barbell / 3x8 185lb @7, 1x6 185lb @9 / warmup: 1x10 95lb, 1x5 135lb / target: 3x8-12 185lb @8 90s
+  OHP / 3x10 95lb / target: 3x10 95lb 60s
+  Pull Ups / 3x8|7 0lb / target: 3x10 0lb 60s
+  Wall Sit / 2x1 0kg 60s, 1x1 0kg 52s / target: 3x1 0kg 60s|45s
+}
