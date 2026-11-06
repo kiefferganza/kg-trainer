@@ -316,12 +316,14 @@ def test_check_on_hevy_prints_the_local_only_fallback(store, planfile):
     assert exc.value.code not in (0, None) and "plan.py validate" in str(exc.value.code)
 
 
-def test_compile_prints_json_and_undeclared_ops_exit_nonzero(store, planfile, capsys):
+def test_compile_prints_json_and_undeclared_ops_exit_nonzero(store, planfile, capsys, monkeypatch):
     app.cmd_use(ns(name="hevy"))
     capsys.readouterr()
     app.cmd_compile(ns(plan=planfile, week=1))
     assert json.loads(capsys.readouterr().out)["week"] == 1
     app.cmd_use(ns(name="liftosaur"))
+    from adapters import liftosaur
+    monkeypatch.setattr(liftosaur, "CAPABILITIES", liftosaur.CAPABILITIES - {"push_plan"})
     with pytest.raises(SystemExit) as exc:
         app.cmd_push(ns(plan=planfile, name="B", week=None, yes=True))
     assert "does not support push_plan" in str(exc.value.code)

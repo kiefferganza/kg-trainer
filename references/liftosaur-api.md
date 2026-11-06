@@ -89,3 +89,29 @@ Liftosaur identifies exercises by name with an optional equipment suffix — `Be
 `Bench Press, Dumbbell`, `Bicep Curl, Cable`. There are no opaque template ids. The built-in
 list is `exercises.txt`; the name-to-muscle map used by the balance table is
 `exercise-muscles.json`.
+
+## Cross-check: program-stats muscle names
+
+`app.py check <plan>` prints the local `plan.py stats` counts beside Liftosaur's
+`program-stats` `muscleGroups`, week `current_week` of the plan, and flags every
+difference without resolving it (exit 2). Liftosaur names are mapped onto the skill's
+muscle vocabulary in `adapters/liftosaur.py` (`MUSCLE_TO_SKILL`, case and separators
+ignored): Abs -> abdominals, Quads/Quadriceps -> quadriceps, Upper Back -> upper_back,
+Lower Back -> lower_back, Traps -> traps; Chest, Shoulders, Triceps, Biceps, Lats,
+Hamstrings, Glutes, Calves, Adductors, Forearms map to themselves. Liftosaur's `Back`
+spans several skill muscles, so it is compared with the sum of lats + upper_back +
+lower_back + traps. Any other name is shown as returned. Liftosaur also counts
+synergist sets fractionally (the 2026-10-12 check saw shoulders 7, chest 6.5), while
+`plan.py stats` counts each working set once under its primary muscle, so differences
+are expected. This mapping and the response shape are unverified until the ticket 05 live
+run is recorded.
+
+## Compile notes (Canonical Plan -> Liftoscript)
+
+- One program, every week: `# Week N`, `## <day name>`, one exercise line per exercise.
+- `progress:` is written where an exercise's effective rule first appears and again
+  wherever it changes (deload weeks and per-week overrides), `progress: none` to switch off.
+- Warmups come from the plan's warmup sets, `warmup: none` when it has none. Drop sets
+  compile as plain working sets; a failure set is an AMRAP (`N+`). A null load is `0kg`
+  (or `@rpe` when the set has an RPE).
+- Cue and RIR become `//` description lines, repeated on every occurrence.

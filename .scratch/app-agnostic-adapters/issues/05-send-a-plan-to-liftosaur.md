@@ -6,9 +6,9 @@
 
 **Status:** ready-for-agent
 
-- [ ] Compiled Liftoscript for a fixture plan matches an approved golden file
-- [ ] A plan whose Native Rule names another app fails to compile with a message naming the exercise
-- [ ] The cross-check reports local and Liftosaur weekly set counts side by side and flags differences
-- [ ] Push returns and records the program id in `profile.json`; no id means the push is reported as failed
-- [ ] Update and get work by id and by `current`
+- [x] Compiled Liftoscript for a fixture plan matches an approved golden file
+- [x] A plan whose Native Rule names another app fails to compile with a message naming the exercise
+- [x] The cross-check reports local and Liftosaur weekly set counts side by side and flags differences
+- [x] Push returns and records the program id in `profile.json`; no id means the push is reported as failed
+- [x] Update and get work by id and by `current`
 - [ ] Live verification against the user's Liftosaur account is recorded, including one recorded playground response with `finish_workout()` for ticket 07

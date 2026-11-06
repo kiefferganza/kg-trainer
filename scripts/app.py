@@ -12,11 +12,13 @@ Usage:
   app.py push <plan> --name NAME [--week N] [--yes]   # create the plan in the app
   app.py update <plan> --id ID [--week N] [--yes]     # rewrite an existing plan
   app.py get <id|current>      # the app's current plan
-  app.py check <plan>          # server-side check, if the app has one
+  app.py check <plan>          # local stats beside the app's server-side check, if it has one
 Writes (push, update) ask first; --yes skips the prompt.
 
 An operation the Active App does not declare prints its Fallback and exits
-non-zero. A store that has never chosen an app is a Liftosaur store.
+non-zero. A store that has never chosen an app is told to run `app.py use <name>`.
+`check` exits 1 when the app rejects the plan and 2 when its set counts differ from
+the local ones; it never picks a winner.
 """
 
 from __future__ import annotations
@@ -29,11 +31,9 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from adapters import contract  # noqa: E402
 
-DEFAULT_APP = "liftosaur"
-
-
 def active():
-    return contract.load(contract.active_app() or DEFAULT_APP)
+    """The Active App's Adapter; a store that has not chosen one is told to run `use`."""
+    return contract.active_adapter()
 
 
 def cmd_apps(_):
@@ -111,7 +111,7 @@ def _compiled(a):
 
 def cmd_compile(a):
     _, compiled = _compiled(a)
-    print(json.dumps(compiled, indent=2))
+    print(compiled if isinstance(compiled, str) else json.dumps(compiled, indent=2))
 
 
 def cmd_push(a):
@@ -144,13 +144,61 @@ def cmd_get(a):
     print(json.dumps(contract.require(adapter, "get_plan")(a.id), indent=2))
 
 
+def _same(x, y) -> bool:
+    return abs(x - y) < 0.01
+
+
+def compare_sets(local: dict, remote: dict, groups: dict) -> list[tuple]:
+    """Rows (muscle, local sets, app sets, differs) over every muscle either side
+    names. An app group (e.g. back) is compared with the sum of the local muscles it
+    spans, and those muscles are then left out of the one-to-one rows."""
+    rows, spanned = [], set()
+    for group, members in groups.items():
+        if group in remote:
+            spanned |= set(members)
+            rows.append((f"{group} ({'+'.join(members)})",
+                         sum(local.get(m, 0) for m in members), remote[group]))
+    for muscle in sorted(set(local) | set(remote),
+                         key=lambda m: (-(local.get(m) or remote.get(m, 0)), m)):
+        if muscle in groups and muscle in remote:
+            continue
+        if muscle in spanned and muscle not in remote:
+            continue
+        rows.append((muscle, local.get(muscle, 0), remote.get(muscle, 0)))
+    return [(m, lo, rem, not _same(lo, rem)) for m, lo, rem in rows]
+
+
 def cmd_check(a):
+    """Local `plan.py stats` always; the app's own check beside it when it has one."""
+    import plan as planmod  # lazy: it resolves the store at import
     adapter = active()
     check = contract.require(adapter, "check")
-    result = check(adapter.compile(load_plan(a.plan)))
-    print(json.dumps(result, indent=2))
+    canonical = load_plan(a.plan)
+    week = canonical["current_week"]
+    local = planmod.weekly_sets(canonical, planmod.load_muscles())[week]
+    result = check(contract.require(adapter, "compile")(canonical))
+    remote = result.get("weekly_sets") or {}
+    print(f"Weekly working sets, week {week}: local plan.py stats vs {adapter.NAME} check")
+    differs = 0
+    if remote:
+        rows = compare_sets(local, remote, getattr(adapter, "MUSCLE_GROUPS", {}))
+        print(f"  {'muscle':<34}{'local':>8}{adapter.NAME:>12}")
+        for muscle, lo, rem, bad in rows:
+            differs += bad
+            print(f"  {muscle:<34}{lo:>8g}{rem:>12g}" + ("   <-- DIFFERS" if bad else ""))
+        print(f"{differs} muscle(s) differ. Neither side is assumed right: report both to the "
+              "athlete and decide which count to trust." if differs else "Counts agree.")
+    else:
+        print("  (the app returned no set counts to compare)")
+        for muscle, n in local.items():
+            print(f"  {muscle:<34}{n:>8g}")
+    for error in result.get("errors", []):
+        print(f"ERROR: {error}", file=sys.stderr)
+    print(f"{adapter.NAME} check: {'ok' if result.get('ok') else 'FAILED'}")
     if not result.get("ok"):
         sys.exit(1)
+    if differs:
+        sys.exit(2)
 
 
 def main():

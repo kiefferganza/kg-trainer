@@ -22,8 +22,8 @@ APP_URLS = ("liftosaur.com", "hevyapp.com")
 # Outside scripts/adapters/, these two are app-specific on purpose. Both are
 # standalone CLIs that nothing else imports.
 ALLOWED = {
-    # The Liftosaur extras CLI: raw reads plus program-* and playground, until
-    # those move behind the contract.
+    # The Liftosaur extras CLI: raw reads, program-* shims and the playground
+    # simulator, which is Liftosaur-only by design.
     "scripts/liftosaur.py",
     # Fetches Liftosaur's built-in exercise list and Liftoscript docs from its
     # public reference endpoint into references/.

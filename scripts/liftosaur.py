@@ -16,6 +16,7 @@ Usage:
                                            # no commands: parse check only; the
                                            # workout lists completed sets, so pass
                                            # complete_set(ex, set) to see targets
+                                           # --record FILE saves the response as a fixture
 
 The key is read from $LIFTOSAUR_API_KEY, else from a .env file in the project
 directory, else from <state>/liftosaur-key. It is never printed, and a failure
@@ -25,6 +26,7 @@ reports the HTTP status, not the key.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import pathlib
 import sys
@@ -33,9 +35,10 @@ import urllib.parse
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from adapters import liftosaur as client  # noqa: E402
 
-# The client (HTTP, pagination, weigh-in parsing) lives in the Liftosaur Adapter;
-# this file is the Liftosaur extras CLI: raw reads plus the program and playground
-# commands, which move behind the Adapter Contract in a later ticket.
+# The client (HTTP, pagination, programs, playground, plan compile/check) lives in the
+# Liftosaur Adapter. This file is the Liftosaur extras CLI: raw reads, the playground
+# simulator (Liftosaur-only) and program-* shims over the Adapter. Planning goes
+# through `app.py compile|push|update|get|check`.
 
 
 # --- commands -------------------------------------------------------------
@@ -90,52 +93,37 @@ def cmd_programs(_):
 
 
 def cmd_program_get(a):
-    pid = urllib.parse.quote(a.id, safe="")
-    what = f"GET /programs/{pid}"
-    data = client.ok(*client.call("GET", f"/programs/{pid}"), what)
-    text = client._field(data, "text", what)
+    data = client.get_plan(a.id)
     if a.out:
-        pathlib.Path(a.out).write_text(text)
+        pathlib.Path(a.out).write_text(data["text"])
         print(f"wrote {a.out}  ({data.get('name', '')}, id {data.get('id', a.id)})")
     else:
-        print(text)
+        print(data["text"])
 
 
 def cmd_program_push(a):
     text = pathlib.Path(a.file).read_text()
-    if a.id:
-        pid = urllib.parse.quote(a.id, safe="")
-        body = {"text": text}
-        if a.name:
-            body["name"] = a.name
-        what = f"PUT /programs/{pid}"
-        data = client.ok(*client.call("PUT", f"/programs/{pid}", body=body), what)
-    else:
-        if not a.name:
-            sys.exit("--name is required when creating a program.")
-        what = "POST /programs"
-        data = client.ok(*client.call("POST", "/programs", body={"name": a.name, "text": text}), what)
+    data, what = client._write_program(text, name=a.name, pid=a.id)
     print(json.dumps({"id": client._field(data, "id", what), "name": client._field(data, "name", what)},
                      indent=2))
 
 
 def cmd_program_stats(a):
-    text = pathlib.Path(a.file).read_text()
-    data = client.ok(*client.call("POST", "/program-stats", body={"programText": text}),
-              "POST /program-stats")
-    print(json.dumps(data, indent=2))
+    print(json.dumps(client.program_stats(pathlib.Path(a.file).read_text()), indent=2))
 
 
 def cmd_playground(a):
     text = pathlib.Path(a.file).read_text()
-    body = {"programText": text}
-    if a.week:
-        body["week"] = a.week
-    if a.day:
-        body["day"] = a.day
-    if a.command:
-        body["commands"] = a.command
-    print(json.dumps(client.ok(*client.call("POST", "/playground", body=body), "POST /playground"), indent=2))
+    data = client.playground(text, a.week, a.day, a.command)
+    print(json.dumps(data, indent=2))
+    if a.record:
+        if not a.command or not any("finish_workout" in c for c in a.command):
+            print("note: no finish_workout() among the commands, so the recording has "
+                  "no updatedProgramText to compare progression against.", file=sys.stderr)
+        record = {"recorded": dt.date.today().isoformat(), "week": a.week, "day": a.day,
+                  "commands": a.command or [], "program_text": text, "response": data}
+        pathlib.Path(a.record).write_text(json.dumps(record, indent=2) + "\n")
+        print(f"recorded {a.record}", file=sys.stderr)
 
 
 def main():
@@ -161,6 +149,8 @@ def main():
     c.add_argument("--week", type=int); c.add_argument("--day", type=int)
     c.add_argument("--command", action="append",
                    help="simulated action, repeatable: complete_set(1, 1), finish_workout()")
+    c.add_argument("--record", metavar="FILE",
+                   help="also save {program_text, commands, response} as a JSON fixture")
     c.set_defaults(fn=cmd_playground)
 
     args = parser.parse_args()
