@@ -4,9 +4,9 @@
 
 **Blocked by:** 04 (Canonical Plan authoring)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Plan tabs render one tab per week and day from a fixture Canonical Plan
-- [ ] An existing Liftosaur store with only a Liftoscript plan produces the same dashboard as before
-- [ ] The build makes no network call for the plan, proven by a test that fails on any request
-- [ ] The output still contains no API key
+- [x] Plan tabs render one tab per week and day from a fixture Canonical Plan
+- [x] An existing Liftosaur store with only a Liftoscript plan produces the same dashboard as before
+- [x] The build makes no network call for the plan, proven by a test that fails on any request
+- [x] The output still contains no API key
