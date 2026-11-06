@@ -9,8 +9,8 @@ def test_no_tracked_file_mentions_hevy():
                            text=True, check=True).stdout.split()
     offenders = {}
     for name in files:
-        if name.startswith("docs/superpowers/"):
-            continue          # the spec and this plan describe the migration itself
+        if name.startswith(("docs/", ".scratch/")) or name == "GLOSSARY.md":
+            continue          # design docs and tickets for the adapter work name Hevy on purpose
         if name == "tests/test_no_hevy.py":
             continue          # this file names what it forbids
         path = ROOT / name
