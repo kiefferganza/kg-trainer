@@ -142,3 +142,19 @@ def set_active_app(name: str) -> dict:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(profile, indent=2) + "\n")
     return app
+
+
+def set_program_id(name: str, program_id: str) -> None:
+    """Record the app's plan id as profile.json `app.program_id` for Active App
+    `name`. Refuses an empty id: a push without an id is not a success."""
+    if not program_id:
+        sys.exit("Refusing to record an empty plan id.")
+    profile = load_profile() or {}
+    app = profile.get("app") if isinstance(profile.get("app"), dict) else {}
+    if app.get("name") != name:
+        app = {"name": name, "key_source": apphttp.key_source(name)}
+    app["program_id"] = str(program_id)
+    profile["app"] = app
+    path = profile_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(profile, indent=2) + "\n")

@@ -1,0 +1,121 @@
+{
+  "week": 2,
+  "routines": [
+    {
+      "routine": {
+        "title": "Upper A",
+        "folder_id": null,
+        "exercises": [
+          {
+            "exercise_template_id": "AAAA0001",
+            "superset_id": null,
+            "rest_seconds": 180,
+            "notes": "Pause one inch off the chest. Target: 2 RIR.",
+            "sets": [
+              {
+                "type": "warmup",
+                "weight_kg": 60,
+                "reps": 8,
+                "rep_range": null
+              },
+              {
+                "type": "normal",
+                "weight_kg": 82.5,
+                "reps": null,
+                "rep_range": {
+                  "start": 6,
+                  "end": 8
+                }
+              },
+              {
+                "type": "normal",
+                "weight_kg": 82.5,
+                "reps": null,
+                "rep_range": {
+                  "start": 6,
+                  "end": 8
+                }
+              },
+              {
+                "type": "dropset",
+                "weight_kg": 60,
+                "reps": 10,
+                "rep_range": null
+              }
+            ]
+          },
+          {
+            "exercise_template_id": "AAAA0003",
+            "superset_id": 0,
+            "rest_seconds": 90,
+            "notes": null,
+            "sets": [
+              {
+                "type": "normal",
+                "weight_kg": 55,
+                "reps": 10,
+                "rep_range": null
+              },
+              {
+                "type": "failure",
+                "weight_kg": 55,
+                "reps": 10,
+                "rep_range": null
+              }
+            ]
+          },
+          {
+            "exercise_template_id": "AAAA0004",
+            "superset_id": 0,
+            "rest_seconds": 60,
+            "notes": "No swing. Target: 1 RIR. RPE 8.",
+            "sets": [
+              {
+                "type": "normal",
+                "weight_kg": 20,
+                "reps": 12,
+                "rep_range": null
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "routine": {
+        "title": "Lower A",
+        "folder_id": null,
+        "exercises": [
+          {
+            "exercise_template_id": "AAAA0002",
+            "superset_id": null,
+            "rest_seconds": 240,
+            "notes": "Brace. Target: 2 RIR.",
+            "sets": [
+              {
+                "type": "normal",
+                "weight_kg": 100,
+                "reps": 5,
+                "rep_range": null
+              }
+            ]
+          },
+          {
+            "exercise_template_id": "AAAA0005",
+            "superset_id": null,
+            "rest_seconds": null,
+            "notes": null,
+            "sets": [
+              {
+                "type": "normal",
+                "weight_kg": null,
+                "reps": 8,
+                "rep_range": null
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
