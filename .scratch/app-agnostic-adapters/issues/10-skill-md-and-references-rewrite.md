@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] Every command in SKILL.md exists and runs as written
-- [ ] Red flags and rationalizations no longer assume Liftosaur, and still forbid invented numbers and unverified pushes
-- [ ] The state layout doc matches what the scripts actually write
-- [ ] Vocabulary matches GLOSSARY.md throughout
-- [ ] A walk-through of STEP 1 to STEP 7 on a Hevy store and on a Liftosaur store works end to end
+- [x] Every command in SKILL.md exists and runs as written (`tests/test_skill_md.py`)
+- [x] Red flags and rationalizations no longer assume Liftosaur, and still forbid invented numbers and unverified pushes
+- [x] The state layout doc matches what the scripts actually write
+- [x] Vocabulary matches GLOSSARY.md throughout
+- [x] A walk-through of STEP 1 to STEP 7 on a Hevy store and on a Liftosaur store works end to end (`tests/test_walkthrough.py`, real script processes on recorded fixtures; no live API, and the recorded logs predate the plan so `progress` held every prescription)
