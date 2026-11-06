@@ -169,8 +169,17 @@ def test_every_plan_operation_is_declared():
 
 # --- check -----------------------------------------------------------------
 
-STATS = {"data": {"muscleGroups": [{"name": "Chest", "sets": 6.5}, {"name": "Abs", "sets": 3},
-                                   {"name": "Back", "sets": 9}]}}
+def group(muscle, sets, synergist_sets=0):
+    """One muscleGroups entry in the shape program-stats returned live on 2026-11-07."""
+    exercises = [{"name": "Primary", "sets": sets, "isSynergist": False}]
+    if synergist_sets:
+        exercises.append({"name": "Helper", "sets": synergist_sets, "isSynergist": True})
+    return {"muscle": muscle, "totalSets": sets + synergist_sets, "exercises": exercises}
+
+
+STATS = {"data": {"muscleGroups": [group("chest", 6, 0.5), group("abs", 3),
+                                   group("rearDelts", 2), group("sideDelts", 1),
+                                   group("upperBack", 0, 4)]}}
 
 
 def serve_check(api, stats=STATS, playground=None, stats_status=200, play_status=200):
@@ -182,7 +191,7 @@ def test_check_returns_ok_and_weekly_sets_in_skill_muscle_names(api):
     serve_check(api)
     result = lift.check("# Week 1\n")
     assert result == {"ok": True, "errors": [],
-                      "weekly_sets": {"chest": 6.5, "abdominals": 3, "back": 9}}
+                      "weekly_sets": {"chest": 6, "abdominals": 3, "shoulders": 3}}
     assert [e[1] for e in api.log] == ["/program-stats", "/playground"]
 
 
@@ -202,6 +211,14 @@ def test_check_reports_an_unrecognised_stats_shape_instead_of_guessing(api):
     assert "muscleGroups" in result["errors"][0]
 
 
+def test_the_live_program_stats_response_parses_to_primary_sets(api):
+    live = json.loads((FIX / "liftosaur_program_stats.live.json").read_text())
+    serve_check(api, stats={"data": live})
+    result = lift.check("# Week 1\n")
+    assert result["weekly_sets"] == {"lats": 6, "biceps": 2, "quadriceps": 5, "chest": 3,
+                                     "shoulders": 2}
+
+
 def test_check_reports_a_playground_error_in_a_200(api):
     serve_check(api, playground={"data": {"error": "Unknown exercise Foo"}})
     result = lift.check("# Week 1\n")
@@ -210,7 +227,10 @@ def test_check_reports_a_playground_error_in_a_200(api):
 
 @pytest.mark.parametrize("theirs,ours", [("Abs", "abdominals"), ("Upper Back", "upper_back"),
                                          ("lower_back", "lower_back"), ("Quads", "quadriceps"),
-                                         ("Back", "back"), ("Neck", "neck")])
+                                         ("Back", "back"), ("Neck", "neck"),
+                                         ("rearDelts", "shoulders"), ("sideDelts", "shoulders"),
+                                         ("frontDelts", "shoulders"), ("upperTraps", "traps"),
+                                         ("rotatorCuff", "rotatorcuff")])
 def test_muscle_mapping(theirs, ours):
     assert lift.skill_muscle(theirs) == ours
 
@@ -277,8 +297,8 @@ def local_week1(planfile):
 
 
 def stats_payload(local, tweak=None):
-    names = {"abdominals": "Abs"}
-    groups = [{"name": names.get(m, m), "sets": n} for m, n in local.items()]
+    names = {"abdominals": "abs", "upper_back": "upperBack"}
+    groups = [group(names.get(m, m), n) for m, n in local.items()]
     return {"data": {"muscleGroups": tweak(groups) if tweak else groups}}
 
 
@@ -293,7 +313,7 @@ def test_check_flags_differences_and_never_resolves_them(store, api, planfile, c
     local = local_week1(planfile)
 
     def tweak(groups):
-        groups[0]["sets"] += 1.5
+        groups[0]["exercises"][0]["sets"] += 1.5
         return groups
 
     serve_check(api, stats_payload(local, tweak))
@@ -309,8 +329,8 @@ def test_check_compares_a_group_with_the_sum_of_the_muscles_it_spans(store, api,
     assert back > 0
 
     def tweak(groups):
-        return [g for g in groups if g["name"] not in lift.MUSCLE_GROUPS["back"]] + \
-               [{"name": "Back", "sets": back}]
+        return [g for g in groups if g["muscle"] not in lift.MUSCLE_GROUPS["back"]] + \
+               [group("Back", back)]
 
     serve_check(api, stats_payload(local, tweak))
     code, out, _ = run_check(planfile, capsys)

@@ -28,32 +28,32 @@ Pull Up / 2x8 0kg / warmup: none
 ## Upper A
 // Pause one inch off the chest.
 // Target: 2 RIR
-Bench Press / 3x6 82.5kg / 180s / warmup: none
-Lat Pulldown / 2x10 57.5kg / 90s / warmup: none / superset: A
+Bench Press / 3x6 82.5kg / 180s
+Lat Pulldown / 2x10 57.5kg / 90s / superset: A
 // Target: 1 RIR
-Bicep Curl, Cable / 2x12 20kg @8 / 60s / warmup: none / superset: A
-Lateral Raise / 2x15 8kg / 60s / warmup: none / progress: none
+Bicep Curl, Cable / 2x12 20kg @8 / 60s / superset: A
+Lateral Raise / 2x15 8kg / 60s / progress: none
 
 ## Lower A
 // Brace.
 // Target: 2 RIR
-Squat / 3x5 102.5kg / 240s / warmup: none
+Squat / 3x5 102.5kg / 240s
 // Target: 2 RIR
-Leg Press / 2x10 160kg / 120s / warmup: none
-Pull Up / 2x8 0kg / warmup: none
+Leg Press / 2x10 160kg / 120s
+Pull Up / 2x8 0kg
 
 # Week 3
 /// deload
 
 ## Upper A
 // Target: 4 RIR
-Bench Press / 2x6 70kg / 180s / warmup: none / progress: none
-Lat Pulldown / 2x10 45kg / 90s / warmup: none / progress: none / superset: A
+Bench Press / 2x6 70kg / 180s / progress: none
+Lat Pulldown / 2x10 45kg / 90s / progress: none / superset: A
 //
-Bicep Curl, Cable / 1x12 15kg @7 / 60s / warmup: none / progress: none / superset: A
+Bicep Curl, Cable / 1x12 15kg @7 / 60s / progress: none / superset: A
 
 ## Lower A
 // Target: 4 RIR
-Squat / 2x5 85kg / 240s / warmup: none / progress: lp(2.5kg)
+Squat / 2x5 85kg / 240s / progress: lp(2.5kg)
 //
-Leg Press / 1x10 120kg / 120s / warmup: none / progress: none
+Leg Press / 1x10 120kg / 120s / progress: none

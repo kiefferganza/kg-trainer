@@ -1,0 +1,280 @@
+{
+  "days": [
+    {
+      "name": "Upper A",
+      "approxMinutes": 33,
+      "workingSets": 11
+    },
+    {
+      "name": "Lower A",
+      "approxMinutes": 30,
+      "workingSets": 7
+    }
+  ],
+  "totalWeeklySets": 18,
+  "strengthSets": 6,
+  "hypertrophySets": 12,
+  "muscleGroups": [
+    {
+      "muscle": "lats",
+      "totalSets": 6,
+      "strengthSets": 0,
+      "hypertrophySets": 6,
+      "frequencyPerWeek": 2,
+      "exercises": [
+        {
+          "name": "Lat Pulldown",
+          "sets": 4,
+          "isSynergist": false
+        },
+        {
+          "name": "Pull Up",
+          "sets": 2,
+          "isSynergist": false
+        }
+      ]
+    },
+    {
+      "muscle": "biceps",
+      "totalSets": 5,
+      "strengthSets": 0,
+      "hypertrophySets": 5,
+      "frequencyPerWeek": 2,
+      "exercises": [
+        {
+          "name": "Lat Pulldown",
+          "sets": 2,
+          "isSynergist": true
+        },
+        {
+          "name": "Bicep Curl",
+          "sets": 2,
+          "isSynergist": false
+        },
+        {
+          "name": "Pull Up",
+          "sets": 1,
+          "isSynergist": true
+        }
+      ]
+    },
+    {
+      "muscle": "quadriceps",
+      "totalSets": 5,
+      "strengthSets": 3,
+      "hypertrophySets": 2,
+      "frequencyPerWeek": 1,
+      "exercises": [
+        {
+          "name": "Squat",
+          "sets": 3,
+          "isSynergist": false
+        },
+        {
+          "name": "Leg Press",
+          "sets": 2,
+          "isSynergist": false
+        }
+      ]
+    },
+    {
+      "muscle": "upperBack",
+      "totalSets": 4,
+      "strengthSets": 0,
+      "hypertrophySets": 4,
+      "frequencyPerWeek": 2,
+      "exercises": [
+        {
+          "name": "Lat Pulldown",
+          "sets": 2,
+          "isSynergist": true
+        },
+        {
+          "name": "Lateral Raise",
+          "sets": 1,
+          "isSynergist": true
+        },
+        {
+          "name": "Pull Up",
+          "sets": 1,
+          "isSynergist": true
+        }
+      ]
+    },
+    {
+      "muscle": "chest",
+      "totalSets": 3,
+      "strengthSets": 3,
+      "hypertrophySets": 0,
+      "frequencyPerWeek": 1,
+      "exercises": [
+        {
+          "name": "Bench Press",
+          "sets": 3,
+          "isSynergist": false
+        }
+      ]
+    },
+    {
+      "muscle": "rearDelts",
+      "totalSets": 3,
+      "strengthSets": 0,
+      "hypertrophySets": 3,
+      "frequencyPerWeek": 2,
+      "exercises": [
+        {
+          "name": "Lat Pulldown",
+          "sets": 2,
+          "isSynergist": true
+        },
+        {
+          "name": "Pull Up",
+          "sets": 1,
+          "isSynergist": true
+        }
+      ]
+    },
+    {
+      "muscle": "upperTraps",
+      "totalSets": 3,
+      "strengthSets": 0,
+      "hypertrophySets": 3,
+      "frequencyPerWeek": 2,
+      "exercises": [
+        {
+          "name": "Lat Pulldown",
+          "sets": 2,
+          "isSynergist": true
+        },
+        {
+          "name": "Pull Up",
+          "sets": 1,
+          "isSynergist": true
+        }
+      ]
+    },
+    {
+      "muscle": "rotatorCuff",
+      "totalSets": 3,
+      "strengthSets": 0,
+      "hypertrophySets": 3,
+      "frequencyPerWeek": 2,
+      "exercises": [
+        {
+          "name": "Lat Pulldown",
+          "sets": 2,
+          "isSynergist": true
+        },
+        {
+          "name": "Pull Up",
+          "sets": 1,
+          "isSynergist": true
+        }
+      ]
+    },
+    {
+      "muscle": "frontDelts",
+      "totalSets": 2.5,
+      "strengthSets": 1.5,
+      "hypertrophySets": 1,
+      "frequencyPerWeek": 1,
+      "exercises": [
+        {
+          "name": "Bench Press",
+          "sets": 1.5,
+          "isSynergist": true
+        },
+        {
+          "name": "Lateral Raise",
+          "sets": 1,
+          "isSynergist": true
+        }
+      ]
+    },
+    {
+      "muscle": "glutes",
+      "totalSets": 2.5,
+      "strengthSets": 1.5,
+      "hypertrophySets": 1,
+      "frequencyPerWeek": 1,
+      "exercises": [
+        {
+          "name": "Squat",
+          "sets": 1.5,
+          "isSynergist": true
+        },
+        {
+          "name": "Leg Press",
+          "sets": 1,
+          "isSynergist": true
+        }
+      ]
+    },
+    {
+      "muscle": "calves",
+      "totalSets": 2.5,
+      "strengthSets": 1.5,
+      "hypertrophySets": 1,
+      "frequencyPerWeek": 1,
+      "exercises": [
+        {
+          "name": "Squat",
+          "sets": 1.5,
+          "isSynergist": true
+        },
+        {
+          "name": "Leg Press",
+          "sets": 1,
+          "isSynergist": true
+        }
+      ]
+    },
+    {
+      "muscle": "adductors",
+      "totalSets": 2.5,
+      "strengthSets": 1.5,
+      "hypertrophySets": 1,
+      "frequencyPerWeek": 1,
+      "exercises": [
+        {
+          "name": "Squat",
+          "sets": 1.5,
+          "isSynergist": true
+        },
+        {
+          "name": "Leg Press",
+          "sets": 1,
+          "isSynergist": true
+        }
+      ]
+    },
+    {
+      "muscle": "sideDelts",
+      "totalSets": 2,
+      "strengthSets": 0,
+      "hypertrophySets": 2,
+      "frequencyPerWeek": 1,
+      "exercises": [
+        {
+          "name": "Lateral Raise",
+          "sets": 2,
+          "isSynergist": false
+        }
+      ]
+    },
+    {
+      "muscle": "triceps",
+      "totalSets": 1.5,
+      "strengthSets": 1.5,
+      "hypertrophySets": 0,
+      "frequencyPerWeek": 1,
+      "exercises": [
+        {
+          "name": "Bench Press",
+          "sets": 1.5,
+          "isSynergist": true
+        }
+      ]
+    }
+  ]
+}

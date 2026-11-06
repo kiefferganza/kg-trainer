@@ -248,6 +248,7 @@ def compile(plan: dict, week: int | None = None) -> str:
     out: list[str] = []
     state: dict[str, str] = {}       # exercise -> progress value last declared
     described: dict[str, bool] = {}  # exercise -> last occurrence had a description
+    warmups: dict[str, str] = {}     # exercise -> warmup declared at first occurrence
     for wk in plan["weeks"]:
         out += [f"# Week {wk['number']}",
                 f"/// {wk['phase']}"
@@ -268,7 +269,18 @@ def compile(plan: dict, week: int | None = None) -> str:
                 parts = [name, _sets(work)]
                 if ex.get("rest_seconds") is not None:
                     parts.append(f"{ex['rest_seconds']}s")
-                parts.append(f"warmup: {_sets(warm)}" if warm else "warmup: none")
+                # Liftosaur fixes warmups at an exercise's first occurrence: re-declaring
+                # them in a later week, even as `warmup: none`, is a parse error
+                # (verified live 2026-11-07). A later week whose warmups differ is
+                # reported, because the app will keep the first week's.
+                warm_text = _sets(warm) if warm else "none"
+                if name not in warmups:
+                    warmups[name] = warm_text
+                    parts.append(f"warmup: {warm_text}")
+                elif warm_text != warmups[name]:
+                    print(f"warning: {name} week {wk['number']} warmup ({warm_text}) "
+                          f"differs from its first week ({warmups[name]}); Liftosaur "
+                          "keeps the first.", file=sys.stderr)
                 rule = effective_rule(plan, wk, name)
                 text = _progress(rule)
                 explicit_none = isinstance(rule, dict) and rule.get("rule") == "none"
@@ -346,8 +358,13 @@ def playground(text: str, week: int | None = None, day: int | None = None,
 
 # Liftosaur's muscle names -> the skill's muscle vocabulary (fetch_reference.MUSCLES).
 # Names are matched lower-case with spaces/underscores/hyphens folded together.
-# UNVERIFIED against a live response until ticket 05's live check is recorded.
+# Verified live 2026-11-07: program-stats names muscles in camelCase (upperBack,
+# rearDelts, sideDelts, frontDelts, upperTraps, rotatorCuff, ...). The delt heads
+# fold into the skill's single `shoulders`; rotatorCuff has no skill muscle and is
+# shown as returned.
 MUSCLE_TO_SKILL = {
+    "frontdelts": "shoulders", "sidedelts": "shoulders", "reardelts": "shoulders",
+    "uppertraps": "traps", "lowertraps": "traps",
     "abs": "abdominals", "abdominals": "abdominals", "core": "abdominals",
     "chest": "chest", "pectorals": "chest",
     "shoulders": "shoulders", "deltoids": "shoulders",
@@ -360,8 +377,6 @@ MUSCLE_TO_SKILL = {
 # Liftosaur groups that span several skill muscles; compared against their sum.
 MUSCLE_GROUPS = {"back": ["lats", "upper_back", "lower_back", "traps"]}
 
-_NAME_KEYS = ("name", "muscle", "muscleGroup", "group", "key")
-_SETS_KEYS = ("sets", "setsCount", "weeklySets", "totalSets", "total", "count", "value")
 
 
 def skill_muscle(name: str) -> str:
@@ -376,29 +391,32 @@ def _number(x) -> bool:
 
 
 def _stats_weekly(stats) -> dict[str, float] | None:
-    """{muscle: sets} from a program-stats payload's `muscleGroups`, or None when
-    the shape is not recognised (then the caller reports it, never guesses)."""
+    """{muscle: primary sets} from a program-stats payload, or None when the shape
+    is not recognised (then the caller reports it, never guesses).
+
+    Verified shape (2026-11-07): `muscleGroups` is a list of
+    {"muscle", "totalSets", "exercises": [{"name", "sets", "isSynergist"}]}.
+    `totalSets` adds fractional synergist credit; plan.py stats counts each
+    exercise once, under its primary muscle. So only non-synergist exercise sets
+    are summed here, which makes the two counts comparable.
+    """
     groups = stats.get("muscleGroups") if isinstance(stats, dict) else None
-    if isinstance(groups, dict):
-        pairs = list(groups.items())
-    elif isinstance(groups, list):
-        pairs = []
-        for g in groups:
-            if not isinstance(g, dict):
-                return None
-            name = next((g[k] for k in _NAME_KEYS if isinstance(g.get(k), str)), None)
-            sets = next((g[k] for k in _SETS_KEYS if _number(g.get(k))), None)
-            if name is None or sets is None:
-                return None
-            pairs.append((name, sets))
-    else:
+    if not isinstance(groups, list):
         return None
     out: dict[str, float] = {}
-    for name, sets in pairs:
-        if not _number(sets):
+    for g in groups:
+        if not isinstance(g, dict) or not isinstance(g.get("muscle"), str) \
+                or not isinstance(g.get("exercises"), list):
             return None
-        key = skill_muscle(name)
-        out[key] = out.get(key, 0) + sets
+        primary = 0
+        for ex in g["exercises"]:
+            if not isinstance(ex, dict) or not _number(ex.get("sets")):
+                return None
+            if not ex.get("isSynergist"):
+                primary += ex["sets"]
+        if primary:
+            key = skill_muscle(g["muscle"])
+            out[key] = out.get(key, 0) + primary
     return out
 
 
