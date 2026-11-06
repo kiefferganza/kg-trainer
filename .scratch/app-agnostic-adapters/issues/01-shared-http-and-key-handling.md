@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] Key resolution takes the app name and works for any app, with the same precedence as today
-- [ ] Redirects are refused for every app, so a key is never re-sent to another host
-- [ ] Every failure message names the operation and HTTP status, and a test proves the key never appears in output
-- [ ] `.gitignore` ignores any `<app>-key` file, not only `liftosaur-key`
-- [ ] The full existing test suite passes unchanged
+- [x] Key resolution takes the app name and works for any app, with the same precedence as today
+- [x] Redirects are refused for every app, so a key is never re-sent to another host
+- [x] Every failure message names the operation and HTTP status, and a test proves the key never appears in output
+- [x] `.gitignore` ignores any `<app>-key` file, not only `liftosaur-key`
+- [x] The full existing test suite passes unchanged

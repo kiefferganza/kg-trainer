@@ -26,137 +26,48 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import http.client
 import json
-import os
 import pathlib
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import paths  # noqa: E402
+from adapters import http as apphttp  # noqa: E402
 
 BASE = "https://www.liftosaur.com/api/v1"
 EXERCISES = pathlib.Path(__file__).resolve().parent.parent / "references" / "exercises.txt"
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """urllib re-sends the Authorization header on redirects, even to another host.
-    Refuse every redirect instead: the redirect status surfaces as an HTTP error."""
+# Redirect refusal, key resolution and status-only errors are shared by every
+# Adapter. Aliases keep the names existing importers and tests use.
+_NoRedirect = apphttp.NoRedirect
+_OPENER = apphttp.OPENER
+_dotenv_value = apphttp.dotenv_value
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
+_KEY_HELP = dict(
+    display="Liftosaur", example="lftsk_...",
+    hint="Create one in the Liftosaur app under Settings -> API Keys. "
+         "A premium subscription is required.")
 
-
-# Module-private on purpose: installing it globally would change urllib for every
-# importer of this module (dashboard.py downloads through plain urlopen).
-_OPENER = urllib.request.build_opener(_NoRedirect)
-
-
-def _dotenv_value(name: str) -> str | None:
-    """Read one variable from the nearest .env, searching the cwd then its parents.
-
-    Nothing in the standard library reads .env, so this is a deliberately small
-    parser: `KEY=VALUE` lines, optional surrounding quotes, `#` comments and blank
-    lines skipped. The walk continues past a .env that does not define `name`, so
-    running from a nested directory (a git worktree, say) still finds the project
-    root's file. An exported variable always wins over .env -- see api_key().
-    """
-    try:
-        start = pathlib.Path.cwd().resolve()
-    except OSError:
-        return None
-    for directory in (start, *start.parents):
-        env_file = directory / ".env"
-        if not env_file.is_file():
-            continue
-        try:
-            text = env_file.read_text()
-        except OSError:
-            continue
-        for raw in text.splitlines():
-            line = raw.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, value = line.partition("=")
-            if key.strip() != name:
-                continue
-            value = value.strip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-                value = value[1:-1]
-            value = value.strip()
-            if value:
-                return value
-    return None
+_HINTS = {
+    401: "  (check the key, and that the subscription is active)",
+    422: "  (invalid Liftoscript -- run program-stats or playground to locate it)",
+}
 
 
 def api_key() -> str:
-    env = os.environ.get("LIFTOSAUR_API_KEY")
-    if env and env.strip():
-        return env.strip()
-    from_dotenv = _dotenv_value("LIFTOSAUR_API_KEY")
-    if from_dotenv:
-        return from_dotenv
-    key_file = paths.state_dir() / "liftosaur-key"
-    if key_file.exists():
-        value = key_file.read_text().strip()
-        if value:
-            return value
-    sys.exit("No Liftosaur API key. Set $LIFTOSAUR_API_KEY, or put "
-             "LIFTOSAUR_API_KEY=lftsk_... in a .env file in the project directory "
-             f"(keep it out of git), or save the key to {key_file} and chmod 600 it. "
-             "Create one in the Liftosaur app under Settings -> API Keys. "
-             "A premium subscription is required.")
+    return apphttp.api_key("liftosaur", **_KEY_HELP)
 
 
 def call(method: str, path: str, params: dict | None = None, body: dict | None = None):
-    url = BASE + path
-    if params:
-        url += "?" + urllib.parse.urlencode(params)
-    data = json.dumps(body).encode() if body is not None else None
-    headers = {"Authorization": f"Bearer {api_key()}", "Accept": "application/json"}
-    if data is not None:
-        headers["Content-Type"] = "application/json"
-    req = urllib.request.Request(url, data=data, method=method, headers=headers)
-    try:
-        with _OPENER.open(req, timeout=60) as response:
-            status, raw = response.status, response.read()
-    except urllib.error.HTTPError as exc:
-        try:
-            status, raw = exc.code, exc.read()
-        except (OSError, http.client.HTTPException):
-            return exc.code, None
-    except (urllib.error.URLError, OSError, http.client.HTTPException) as exc:
-        sys.exit(f"{method} {path} failed: network error ({type(exc).__name__})")
-    try:
-        return status, json.loads(raw or b"null")
-    except ValueError as exc:
-        if status >= 300:
-            return status, None
-        sys.exit(f"{method} {path} failed: HTTP {status}, response was not JSON "
-                 f"({type(exc).__name__})")
+    return apphttp.request("liftosaur", BASE, method, path, params, body, **_KEY_HELP)
 
 
 def ok(status: int, payload, what: str):
     """Unwrap {"data": ...}, or exit with the status. Never echoes the key."""
-    if status >= 300:
-        error = payload.get("error") if isinstance(payload, dict) else None
-        error = error if isinstance(error, dict) else {}
-        detail = " ".join(str(x) for x in (error.get("code"), error.get("message")) if x)
-        hint = ""
-        if status == 401:
-            hint = "  (check the key, and that the subscription is active)"
-        elif status == 422:
-            hint = "  (invalid Liftoscript -- run program-stats or playground to locate it)"
-        elif status < 400:
-            hint = "  (redirect not followed: the API moved or a proxy answered; the key was not forwarded)"
-        sys.exit(f"{what} failed: HTTP {status} {detail}{hint}".rstrip())
-    if not isinstance(payload, dict):
-        sys.exit(f"{what} failed: response was not a JSON object")
-    return payload.get("data")
+    return apphttp.check(status, payload, what, _HINTS)
 
 
 def _field(data, name: str, what: str):
