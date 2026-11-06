@@ -100,11 +100,12 @@ ignored): Abs -> abdominals, Quads/Quadriceps -> quadriceps, Upper Back -> upper
 Lower Back -> lower_back, Traps -> traps; Chest, Shoulders, Triceps, Biceps, Lats,
 Hamstrings, Glutes, Calves, Adductors, Forearms map to themselves. Liftosaur's `Back`
 spans several skill muscles, so it is compared with the sum of lats + upper_back +
-lower_back + traps. Any other name is shown as returned. Liftosaur also counts
-synergist sets fractionally (the 2026-10-12 check saw shoulders 7, chest 6.5), while
-`plan.py stats` counts each working set once under its primary muscle, so differences
-are expected. This mapping and the response shape are unverified until the ticket 05 live
-run is recorded.
+lower_back + traps. Any other name is shown as returned. Verified live 2026-11-07: Liftosaur
+names muscles in camelCase (`upperBack`, `rearDelts`, `sideDelts`, ...; the delt heads fold into
+`shoulders`), and each `muscleGroups` entry lists exercises with `isSynergist`. `totalSets`
+adds fractional synergist credit while `plan.py stats` counts each working set once under its
+primary muscle, so `check` sums only the non-synergist sets; with that the two agreed on every
+muscle. Any difference is reported, not resolved. See `README.md` for the full quirks list.
 
 ## Compile notes (Canonical Plan -> Liftoscript)
 
