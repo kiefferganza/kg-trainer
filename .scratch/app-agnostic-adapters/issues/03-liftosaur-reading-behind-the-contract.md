@@ -11,3 +11,5 @@
 - [x] The weigh-in import works for whichever app is active and still leaves hand-logged days alone
 - [x] The structural import test passes and the Hevy-forbidding test is deleted
 - [x] Switching the Active App replaces the cache on the next pull and leaves check-ins, the weight log and plans untouched
+
+**Live check 2026-11-07:** the real Liftosaur account was pulled into throwaway stores with the code before and after this ticket (370 workouts, 287 weigh-in days). `workouts.jsonl`, `measurements.json` and `deep-dive` came out byte-identical, and `report` differed only in the store path it prints. The pull summary line changed wording as intended.
