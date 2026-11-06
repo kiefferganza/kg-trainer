@@ -154,8 +154,8 @@ def test_double_at_the_top_of_the_range_adds_load_and_resets_to_low(plan):
     for e in plan["weeks"][0]["days"][0]["exercises"][:1]:
         e["sets"] = [_set(8, 60, "warmup")] + [_set(8, 80)] * 3
     new, rows, _ = run(plan, session(**all_done(**{"Bench Press": [(8, 80)] * 3})))
-    # reps 8 -> 6 and +2.5 kg are added to week 2's authored 6 x 82.5
-    assert week2(new, "Bench Press")[1:] == [(4, 85, "working")] * 3
+    # at the top: reps are `low` (absolute) in every week and +2.5 kg is added to week 2's 82.5
+    assert week2(new, "Bench Press")[1:] == [(6, 85, "working")] * 3
     assert rows["Bench Press"]["action"] == "progressed"
 
 
@@ -422,6 +422,80 @@ def test_progress_agrees_with_liftosaurs_recorded_finish_workout_in_every_week()
     # Rule exercise is left to the app.
     assert got["Bicep Curl, Cable"]["action"] == "held"
     assert got["Leg Press"]["why"] == "run by liftosaur"
+
+
+# --- agreement with the dp top/mid range and sum recordings ---------------
+
+def plan_from_program(text):
+    """A Canonical Plan from a recorded Liftoscript program: rules from each exercise's
+    `progress:` in week 1, sets from the parser."""
+    import re
+    from adapters import liftosaur
+    rules = {}
+    for line in text.splitlines():
+        m = re.search(r"progress: (lp|dp|sum)\(([^)]*)\)", line)
+        if not m:
+            continue
+        args = [a.strip() for a in m[2].split(",")]
+        kg = lambda x: float(x.removesuffix("kg"))  # noqa: E731
+        rules[line.split(" / ")[0]] = (
+            {"rule": "linear", "increment_kg": kg(args[0])} if m[1] == "lp" else
+            {"rule": "double", "increment_kg": kg(args[0]), "low": int(args[1]), "high": int(args[2])}
+            if m[1] == "dp" else
+            {"rule": "reps_threshold", "total": int(args[0]), "increment_kg": kg(args[1])})
+    weeks = []
+    for n, rows in sorted(liftosaur.parse_program(text).items()):
+        days = {}
+        for day, name, sets in rows:
+            days.setdefault(day, []).append(_ex(name, [_set(r, kg, "working") for r, kg, _ in sets]))
+        weeks.append({"number": n, "phase": "x", "deload": False,
+                      "days": [{"name": d, "exercises": e} for d, e in days.items()]})
+    return {"schema": 1, "name": "rec", "created": "2026-11-01", "current_week": 1,
+            "weeks": weeks, "progression": rules}
+
+
+@pytest.mark.parametrize("fixture,expected", [
+    ("playground_top_of_range.json", {
+        # dp at the top: reps -> low in every week, load += 2.5 on each week's own load;
+        # sum fired: load -> logged 20 + 2.5 everywhere; lp(1kg): +1 on 8 / 9 / 6
+        "Bench Press": [[(6, 82.5)] * 3, [(6, 85.0)] * 3, [(6, 72.5)] * 2],
+        "Bicep Curl, Cable": [[(15, 22.5)] * 2, [(12, 22.5)] * 2, [(15, 22.5)] * 1],
+        "Lateral Raise": [[(15, 9.0)] * 2, [(12, 10.0)] * 2, [(15, 7.0)] * 1]}),
+    ("playground_mid_range.json", {
+        # dp below the top: reps -> logged 6 + 1 in every week, loads untouched;
+        # sum(15) fired on 100 kg: load -> 102.5 in every week, reps untouched
+        "Bench Press": [[(7, 80.0)] * 3, [(7, 82.5)] * 3, [(7, 70.0)] * 2],
+        "Squat": [[(5, 102.5)] * 3, [(3, 102.5)] * 3, [(5, 102.5)] * 2]}),
+])
+def test_progress_agrees_with_the_dp_and_sum_recordings_in_every_week(fixture, expected):
+    from adapters import liftosaur
+    rec = json.loads((FIX / fixture).read_text())
+    updated = rec["response"]["updatedProgramText"]
+    plan = plan_from_program(rec["program_text"])
+    logged = liftohistory.parse_liftohistory(rec["response"]["workout"])
+    # The playground rounds a prescribed 8 kg to the 7.5 kg its default plates make
+    # (Lateral Raise), then counts the set as done. The skill holds a set lighter than
+    # prescribed, so feed it the prescribed load for that recording artifact.
+    prescribed = {e["exercise"]: e["sets"][0]["load_kg"] for e in plan["weeks"][0]["days"][0]["exercises"]}
+    for w in logged:
+        for e in w["exercises"]:
+            for st in e["sets"]:
+                if abs(st["weight_kg"] - prescribed[e["title"]]) <= 0.5:
+                    st["weight_kg"] = prescribed[e["title"]]
+    new, rows, info = planmod.progress_plan(plan, logged)
+    assert info["advanced"]
+    theirs_all = liftosaur.parse_program(updated)
+    for n in (1, 2, 3):
+        mine = {(d, e): sets for d, e, sets in contract.plan_prescriptions(new, n)}
+        theirs = {(d, e): sets for d, e, sets in theirs_all[n]}
+        assert mine.keys() == theirs.keys()
+        for key in mine:
+            assert contract._norm(mine[key]) == contract._norm(theirs[key]), (fixture, n, key)
+    for name, per_week in expected.items():
+        for n, want in zip((1, 2, 3), per_week):
+            got = [(r, kg) for r, kg, _ in {e: s for d, e, s in theirs_all[n]}[name]]
+            assert got == want, (fixture, name, n)
+        assert {r["exercise"]: r["action"] for r in rows}[name] == "progressed"
 
 
 # --- progress, then update moves a Hevy account to the next week ----------
