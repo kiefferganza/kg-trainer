@@ -125,15 +125,15 @@ Rules every Adapter follows:
       "days": [
         { "name": "Upper A",
           "exercises": [
-            { "exercise": "Bench Press, Barbell",       // Canonical Exercise Name
+            { "exercise": "Bench Press",                // Canonical Exercise Name
               "sets": [ { "reps": 8, "load_kg": 80, "rpe": null, "kind": "working" } ],
               "rest_seconds": 180,
               "cue": "Pause one inch off the chest.",
               "rir_target": 2,
               "superset": null } ] } ] } ],
   "progression": {
-    "Bench Press, Barbell": { "rule": "double", "increment_kg": 2.5, "low": 6, "high": 8 },
-    "Lat Pulldown, Cable":  { "rule": "linear", "increment_kg": 2.5 },
+    "Bench Press":          { "rule": "double", "increment_kg": 2.5, "low": 6, "high": 8 },
+    "Lat Pulldown":         { "rule": "linear", "increment_kg": 2.5 },
     "Leg Press":            { "native": "liftosaur", "text": "custom() {~ ... ~}" }
   }
 }
@@ -148,7 +148,9 @@ week object), which overrides the block-level rule for that week only.
 
 - `validate <plan>`: schema, canonical names known (shipped or personal map), every Progression
   Rule well-formed, and every barbell, smith-machine, EZ-bar and trap-bar load a multiple of
-  2.5 kg (equipment read from the name suffix). Dumbbell and machine loads are not checked,
+  2.5 kg. Equipment comes from the name suffix; a bare name is the default equipment, and the
+  barbell lifts among bare names (Squat, Bench Press, Deadlift and their variants) are listed
+  explicitly in `plan.py`. Dumbbell and machine loads are not checked,
   because the profile does not yet record dumbbell sizes or pin steps in structured form; the
   coach still rounds them, as SKILL.md requires.
 - `stats <plan>`: weekly working sets per muscle from the muscle map. This replaces counting by
