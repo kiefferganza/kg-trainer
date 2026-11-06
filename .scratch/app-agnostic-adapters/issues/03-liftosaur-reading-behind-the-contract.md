@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] Liftosaur declares and implements `ping`, `pull_history`, `pull_bodyweight` and `find_exercise` through the contract; its exercise translation is identity
+- [x] Liftosaur declares and implements `ping`, `pull_history`, `pull_bodyweight` and `find_exercise` through the contract; its exercise translation is identity
 - [ ] Pull, report and deep-dive output is byte-identical on the user's real Liftosaur store, compared before and after
-- [ ] The weigh-in import works for whichever app is active and still leaves hand-logged days alone
-- [ ] The structural import test passes and the Hevy-forbidding test is deleted
-- [ ] Switching the Active App replaces the cache on the next pull and leaves check-ins, the weight log and plans untouched
+- [x] The weigh-in import works for whichever app is active and still leaves hand-logged days alone
+- [x] The structural import test passes and the Hevy-forbidding test is deleted
+- [x] Switching the Active App replaces the cache on the next pull and leaves check-ins, the weight log and plans untouched

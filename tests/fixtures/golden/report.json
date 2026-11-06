@@ -1,0 +1,127 @@
+{
+  "workout_count": 4,
+  "log_spans": {
+    "first": "2026-09-01",
+    "last": "2026-10-13"
+  },
+  "frequency": {
+    "sessions_last_12wk": 4,
+    "sessions_per_week": 0.33,
+    "distinct_training_days": 4,
+    "longest_gap_days": 28,
+    "longest_gap_between": "2026-09-08 -> 2026-10-06"
+  },
+  "best_sets": [
+    {
+      "exercise": "Bench Press",
+      "sets_logged": 9,
+      "heaviest_set": "85.0kg x 8",
+      "best_e1rm_kg": 107.7,
+      "best_e1rm_from": "85.0kg x 8",
+      "best_e1rm_date": "2026-10-13"
+    },
+    {
+      "exercise": "Lat Pulldown, Cable",
+      "sets_logged": 9,
+      "heaviest_set": "55.0kg x 10",
+      "best_e1rm_kg": 73.3,
+      "best_e1rm_from": "55.0kg x 10",
+      "best_e1rm_date": "2026-10-13"
+    },
+    {
+      "exercise": "Custom Sled Thing",
+      "sets_logged": 4,
+      "heaviest_set": "40.0kg x 10",
+      "best_e1rm_kg": 53.3,
+      "best_e1rm_from": "40.0kg x 10",
+      "best_e1rm_date": "2026-10-06"
+    },
+    {
+      "exercise": "Squat, Barbell",
+      "sets_logged": 3,
+      "heaviest_set": "120.0kg x 5",
+      "best_e1rm_kg": 140.0,
+      "best_e1rm_from": "120.0kg x 5",
+      "best_e1rm_date": "2026-10-06"
+    },
+    {
+      "exercise": "Romanian Deadlift",
+      "sets_logged": 3,
+      "heaviest_set": "90.0kg x 8",
+      "best_e1rm_kg": 114.0,
+      "best_e1rm_from": "90.0kg x 8",
+      "best_e1rm_date": "2026-10-06"
+    },
+    {
+      "exercise": "Mystery Machine",
+      "sets_logged": 2,
+      "note": "no weight x reps <=10 sets \u2014 bodyweight or timed work"
+    }
+  ],
+  "trend": [
+    {
+      "exercise": "Bench Press",
+      "e1rm_now": 107.7,
+      "e1rm_8wk_ago": null,
+      "change_kg": null,
+      "note": "not enough data in one window to compare"
+    },
+    {
+      "exercise": "Lat Pulldown, Cable",
+      "e1rm_now": 73.3,
+      "e1rm_8wk_ago": null,
+      "change_kg": null,
+      "note": "not enough data in one window to compare"
+    },
+    {
+      "exercise": "Custom Sled Thing",
+      "e1rm_now": 53.3,
+      "e1rm_8wk_ago": null,
+      "change_kg": null,
+      "note": "not enough data in one window to compare"
+    },
+    {
+      "exercise": "Squat, Barbell",
+      "e1rm_now": 140.0,
+      "e1rm_8wk_ago": null,
+      "change_kg": null,
+      "note": "not enough data in one window to compare"
+    },
+    {
+      "exercise": "Romanian Deadlift",
+      "e1rm_now": 114.0,
+      "e1rm_8wk_ago": null,
+      "change_kg": null,
+      "note": "not enough data in one window to compare"
+    }
+  ],
+  "balance": {
+    "window": "last 8 weeks",
+    "sets_by_muscle": {
+      "chest": 9,
+      "lats": 9,
+      "unknown": 6,
+      "quadriceps": 3,
+      "hamstrings": 3
+    },
+    "average_sets": 6.0,
+    "under_half_average": [],
+    "push_sets": 9,
+    "pull_sets": 9,
+    "push_pull_ratio": 1.0,
+    "push_pull_flag": false,
+    "unclassified_exercises": {
+      "Custom Sled Thing": 4,
+      "Mystery Machine": 2
+    }
+  },
+  "rpe": {
+    "top_sets_with_rpe": 6,
+    "average_top_set_rpe": 8.17
+  },
+  "bodyweight": {
+    "n": 3,
+    "latest": "2026-10-12 70.1kg",
+    "earliest": "2026-10-09 69.85kg"
+  }
+}

@@ -1,0 +1,57 @@
+## Baseline — 4 logged workouts (2026-09-01 to 2026-10-13)
+
+### Frequency (last 12 weeks)
+
+| Metric | Value |
+|---|---|
+| Sessions | 4 |
+| Per week | 0.33 |
+| Longest gap | 28 days (2026-09-08 -> 2026-10-06) |
+
+### Best sets (Epley, sets of <=10 reps, warmups excluded)
+
+| Exercise | Sets | Heaviest | Est. 1RM | From | Date |
+|---|---|---|---|---|---|
+| Bench Press | 9 | 85.0kg x 8 | **107.7 kg** | 85.0kg x 8 | 2026-10-13 |
+| Lat Pulldown, Cable | 9 | 55.0kg x 10 | **73.3 kg** | 55.0kg x 10 | 2026-10-13 |
+| Custom Sled Thing | 4 | 40.0kg x 10 | **53.3 kg** | 40.0kg x 10 | 2026-10-06 |
+| Squat, Barbell | 3 | 120.0kg x 5 | **140.0 kg** | 120.0kg x 5 | 2026-10-06 |
+| Romanian Deadlift | 3 | 90.0kg x 8 | **114.0 kg** | 90.0kg x 8 | 2026-10-06 |
+| Mystery Machine | 2 | — | — | no weight x reps <=10 sets — bodyweight or timed work | — |
+
+### Trend (est. 1RM, last 8 weeks vs the 8 before)
+
+| Exercise | Now | 8 wk ago | Change |
+|---|---|---|---|
+| Bench Press | 107.7 | — | not enough data in one window to compare |
+| Lat Pulldown, Cable | 73.3 | — | not enough data in one window to compare |
+| Custom Sled Thing | 53.3 | — | not enough data in one window to compare |
+| Squat, Barbell | 140.0 | — | not enough data in one window to compare |
+| Romanian Deadlift | 114.0 | — | not enough data in one window to compare |
+
+### Balance — working sets by muscle, last 8 weeks
+
+| Muscle | Sets |
+|---|---|
+| chest | 9 |
+| lats | 9 |
+| unknown | 6 |
+| quadriceps | 3 |
+| hamstrings | 3 |
+
+Average 6.0 sets/muscle. Push 9 : pull 9 = 1.0
+
+6 of those sets are from exercises with no muscle mapping, so the table above undercounts whatever they really train:
+
+- Custom Sled Thing — 4 sets
+- Mystery Machine — 2 sets
+
+Map custom exercises in <STORE>/no-personal-map.json, e.g. {"bayesian curl": "biceps"}.
+
+### RPE
+
+Average top-set RPE over the last 8 weeks: **8.17** across 6 top sets.
+
+### Bodyweight
+
+3 weigh-ins, 2026-10-09 69.85kg -> 2026-10-12 70.1kg

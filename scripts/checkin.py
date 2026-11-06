@@ -8,7 +8,7 @@ State lives in kg-trainer-data (store root resolved by paths.py):
 
 Usage:
   checkin.py log-weight <YYYY-MM-DD> <KG> [--fat PCT] [--waist CM]
-  checkin.py import-liftosaur              # pull weigh-ins from Liftosaur into the log
+  checkin.py import-app                    # pull weigh-ins from the Active App into the log
   checkin.py trend [--window 7] [--calories N]
   checkin.py record --calories N --protein G --carbs G --fat G [--notes TEXT]
   checkin.py history [--last N]
@@ -23,11 +23,13 @@ import argparse
 import csv
 import datetime as dt
 import json
+import pathlib
 import statistics
 import sys
 
-import liftosaur
-import paths
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import paths  # noqa: E402
+from adapters import contract  # noqa: E402
 
 HOME = paths.state_dir()
 PROFILE = HOME / "profile.json"
@@ -69,32 +71,23 @@ def cmd_log_weight(a):
     print(f"logged {a.date}: {a.weight} kg")
 
 
-def cmd_import_liftosaur(a):
-    """Pull weigh-ins from Liftosaur so the local log is not the only source.
+def cmd_import_app(a):
+    """Pull weigh-ins from the Active App so the local log is not the only source.
 
-    Days already in the log are left alone, so a hand-logged entry wins. When
-    a day has several weigh-ins, the latest one is imported.
+    Days already in the log are left alone, so a hand-logged entry wins. The
+    Adapter gives one reading per day (the latest wins).
     """
-    values = liftosaur.paginate("/measurements/weight", "values")
-    latest: dict[dt.date, tuple] = {}
-    unreadable = 0
-    for v in values:
-        read = liftosaur.weigh_in(v)
-        if read is None:
-            unreadable += 1
-            continue
-        ts = v.get("timestamp") or 0
-        if read[0] not in latest or ts > latest[read[0]][0]:
-            latest[read[0]] = (ts, read[1])
+    adapter = contract.active_adapter()
+    readings = contract.require(adapter, "pull_bodyweight")()
     existing = {d for d, _ in load_weights()}
     added = 0
-    for day in sorted(latest):
+    for day, kg in sorted(readings):
         if day in existing:
             continue
-        _append_weight(day.isoformat(), latest[day][1], None, None)
+        _append_weight(day.isoformat(), kg, None, None)
         added += 1
-    print(f"imported {added} new weigh-ins from Liftosaur ({len(values)} values seen"
-          + (f", {unreadable} unreadable and skipped" if unreadable else "") + ")")
+    print(f"imported {added} new weigh-ins from {adapter.NAME} "
+          f"({len(readings)} weigh-in days seen)")
 
 
 def window_avg(rows, end: dt.date, days: int):
@@ -197,7 +190,7 @@ def main():
     c.add_argument("--fat", type=float); c.add_argument("--waist", type=float)
     c.set_defaults(fn=cmd_log_weight)
 
-    sub.add_parser("import-liftosaur").set_defaults(fn=cmd_import_liftosaur)
+    sub.add_parser("import-app").set_defaults(fn=cmd_import_app)
 
     c = sub.add_parser("trend"); c.add_argument("--window", type=int, default=7)
     c.add_argument("--calories", type=int); c.set_defaults(fn=cmd_trend)

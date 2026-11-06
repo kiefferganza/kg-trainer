@@ -130,6 +130,16 @@ def active_app() -> str | None:
     return name if isinstance(name, str) and name else None
 
 
+def active_adapter():
+    """The Active App's Adapter. A store that has never chosen one gets a pointer
+    to `app.py use`, not a guess."""
+    name = active_app()
+    if name is None:
+        sys.exit("No Active App chosen for this store. Run `app.py use <name>` "
+                 f"(shipped: {', '.join(names())}).")
+    return load(name)
+
+
 def set_active_app(name: str) -> dict:
     """Record `name` as the Active App. Switching apps drops the old program_id."""
     profile = load_profile() or {}
