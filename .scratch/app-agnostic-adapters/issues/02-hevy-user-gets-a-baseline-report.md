@@ -16,4 +16,4 @@ Start from the Hevy facts recorded in the spec (restored from git history at `a9
 - [ ] A shipped Hevy exercise map exists, built from Hevy's catalogue and reviewed; the store's personal override wins over it (partial: seed map and builder shipped, override tested; full map needs a live build)
 - [x] The baseline report runs on a Hevy store, with recorded-fixture tests
 - [x] The `liftosaur` → `app` profile migration is idempotent and logs once
-- [ ] Live verification against the user's Hevy account is recorded with a date
+- [ ] Live verification against the user's Hevy account is recorded with a date — deferred: user has no Hevy Pro (2026-11-07); ships fixture-tested and marked unverified

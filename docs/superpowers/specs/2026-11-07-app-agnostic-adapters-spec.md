@@ -37,7 +37,9 @@ execution.
 5. **One Active App per store.** No mixing apps for history, bodyweight or plans.
 6. **This change ships two Adapters: Liftosaur and Hevy.** A second real app is what keeps the
    contract from quietly taking Liftosaur's shape. Hevy, with no weeks and no progression, is
-   the stress test. The user has a Hevy Pro key, so Hevy is verified live.
+   the stress test. **Update 2026-11-07:** the user no longer has Hevy Pro, so the Hevy Adapter
+   ships tested against recorded fixtures only and is marked unverified in its reference doc.
+   Liftosaur is the only Adapter verified live in this change.
 7. **Canonical Plan is JSON** (`plans/meso-NN.plan.json`), because the scripts are stdlib-only.
    `meso-NN.md` is generated from it and never hand-edited.
 8. **Progression Rule vocabulary:** `linear(increment)`, `double(increment, low, high)`,
