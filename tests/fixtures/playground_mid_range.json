@@ -1,0 +1,19 @@
+{
+  "recorded": "2026-11-07",
+  "week": 1,
+  "day": 1,
+  "commands": [
+    "complete_set(1, 1)",
+    "complete_set(1, 2)",
+    "complete_set(1, 3)",
+    "complete_set(2, 1)",
+    "complete_set(2, 2)",
+    "complete_set(2, 3)",
+    "finish_workout()"
+  ],
+  "program_text": "# Week 1\n## Day A\nBench Press / 3x6 80kg / 180s / warmup: none / progress: dp(2.5kg, 6, 10)\nSquat / 3x5 100kg / 180s / warmup: none / progress: sum(15, 2.5kg)\n\n# Week 2\n## Day A\nBench Press / 3x8 82.5kg / 180s\nSquat / 3x3 110kg / 180s\n\n# Week 3\n## Day A\nBench Press / 2x5 70kg / 180s / progress: none\nSquat / 2x5 90kg / 180s / progress: none\n",
+  "response": {
+    "workout": "2026-11-06 23:46:46 +00:00 / program: \"Playground\" / dayName: \"Week 1 - Day A\" / week: 1 / dayInWeek: 1 / exercises: {\n  Bench Press / 3x6 80kg / target: 3x6 80kg 180s\n  Squat / 3x5 100kg / target: 3x5 100kg 180s\n}",
+    "updatedProgramText": "# Week 1\n## Day A\nBench Press / 3x7 / 80kg 180s / warmup: none / progress: dp(2.5kg, 6, 10)\nSquat / 3x5 / 102.5kg 180s / warmup: none / progress: sum(15, 2.5kg)\n\n\n# Week 2\n## Day A\nBench Press / 3x7 / 82.5kg 180s\nSquat / 3x3 / 102.5kg 180s\n\n\n# Week 3\n## Day A\nBench Press / 2x7 / 70kg 180s / progress: none\nSquat / 2x5 / 102.5kg 180s / progress: none\n\n\n"
+  }
+}
