@@ -12,3 +12,5 @@
 - [x] Push returns and records the program id in `profile.json`; no id means the push is reported as failed
 - [x] Update and get work by id and by `current`
 - [ ] Live verification against the user's Liftosaur account is recorded, including one recorded playground response with `finish_workout()` for ticket 07
+
+**Live check 2026-11-07 (main session, read-only and simulation calls only):** the first compile was rejected (422) because it re-declared warmups in later weeks; fixed in 9beeaa2. The fixture plan now compiles, parses in `program-stats` and `playground`, and `app.py check` agrees with local stats on every muscle once synergist sets are excluded. The live `program-stats` response is `tests/fixtures/liftosaur_program_stats.live.json`. The playground fixture for ticket 07 is `tests/fixtures/playground_finish.json` (week 1, Upper A, every set of Bench Press and Lat Pulldown completed, then `finish_workout()`). Push, get and update have **not** been run live, because they write to the user's account.

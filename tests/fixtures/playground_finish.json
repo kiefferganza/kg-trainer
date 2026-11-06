@@ -1,0 +1,20 @@
+{
+  "recorded": "2026-11-07",
+  "week": 1,
+  "day": 1,
+  "commands": [
+    "complete_set(1, 1)",
+    "complete_set(1, 2)",
+    "complete_set(1, 3)",
+    "complete_set(2, 1)",
+    "complete_set(2, 2)",
+    "complete_set(2, 3)",
+    "complete_set(2, 4)",
+    "finish_workout()"
+  ],
+  "program_text": "# Week 1\n/// accumulation\n\n## Upper A\n// Pause one inch off the chest.\n// Target: 3 RIR\nBench Press / 3x6 80kg / 180s / warmup: 1x8 60kg / progress: dp(2.5kg, 6, 8)\nLat Pulldown / 2x10 55kg, 1x10 45kg, 1x12+ 40kg / 90s / warmup: none / progress: lp(2.5kg) / superset: A\n// No swing.\n// Squeeze at the top.\n// Target: 1 RIR\nBicep Curl, Cable / 2x12 20kg @8 / 60s / warmup: none / progress: sum(30, 2.5kg) / superset: A\nLateral Raise / 2x15 8kg / 60s / warmup: none / progress: lp(1kg)\n\n## Lower A\n// Brace.\n// Target: 2 RIR\nSquat / 3x5 100kg / 240s / warmup: none / progress: none\n// Target: 2 RIR\nLeg Press / 2x10 160kg / 120s / warmup: none / progress: custom() {~\n  if (completedReps >= reps) { weights += 5kg }\n~}\nPull Up / 2x8 0kg / warmup: none\n\n# Week 2\n/// accumulation\n\n## Upper A\n// Pause one inch off the chest.\n// Target: 2 RIR\nBench Press / 3x6 82.5kg / 180s\nLat Pulldown / 2x10 57.5kg / 90s / superset: A\n// Target: 1 RIR\nBicep Curl, Cable / 2x12 20kg @8 / 60s / superset: A\nLateral Raise / 2x15 8kg / 60s / progress: none\n\n## Lower A\n// Brace.\n// Target: 2 RIR\nSquat / 3x5 102.5kg / 240s\n// Target: 2 RIR\nLeg Press / 2x10 160kg / 120s\nPull Up / 2x8 0kg\n\n# Week 3\n/// deload\n\n## Upper A\n// Target: 4 RIR\nBench Press / 2x6 70kg / 180s / progress: none\nLat Pulldown / 2x10 45kg / 90s / progress: none / superset: A\n//\nBicep Curl, Cable / 1x12 15kg @7 / 60s / progress: none / superset: A\n\n## Lower A\n// Target: 4 RIR\nSquat / 2x5 85kg / 240s / progress: lp(2.5kg)\n//\nLeg Press / 1x10 120kg / 120s / progress: none\n",
+  "response": {
+    "workout": "2026-11-06 23:27:12 +00:00 / program: \"Playground\" / dayName: \"Week 1 - Upper A\" / week: 1 / dayInWeek: 1 / exercises: {\n  Bench Press / 3x6 80kg / target: 3x6 80kg 180s\n  Lat Pulldown / 2x10 55kg, 1x10 45kg, 1x12 40kg / target: 2x10 55kg 90s, 1x10 45kg 90s, 1x12+ 40kg 90s\n}",
+    "updatedProgramText": "# Week 1\n## Upper A\n// Pause one inch off the chest.\n// Target: 3 RIR\nBench Press / 3x7 / 80kg 180s / warmup: 1x8 60kg / progress: dp(2.5kg, 6, 8)\nLat Pulldown / 2x10 57.5kg, 1x10 47.5kg, 1x12+ 42.5kg / 90s / warmup: none / superset: A / progress: lp(2.5kg)\n// No swing.\n// Squeeze at the top.\n// Target: 1 RIR\nBicep Curl, Cable / 2x12 / 20kg @8 60s / warmup: none / superset: A / progress: sum(30, 2.5kg)\nLateral Raise / 2x15 / 8kg 60s / warmup: none / progress: lp(1kg)\n\n## Lower A\n// Brace.\n// Target: 2 RIR\nSquat / 3x5 / 100kg 240s / warmup: none / progress: none\n// Target: 2 RIR\nLeg Press / 2x10 / 160kg 120s / warmup: none / progress: custom() {~\n  if (completedReps >= reps) { weights += 5kg }\n~}\nPull Up / 2x8 / 0kg / warmup: none\n\n\n# Week 2\n## Upper A\n// Pause one inch off the chest.\n// Target: 2 RIR\nBench Press / 3x7 / 82.5kg 180s\nLat Pulldown / 2x10 / 60kg 90s / superset: A\n// Target: 1 RIR\nBicep Curl, Cable / 2x12 / 20kg @8 60s / superset: A\nLateral Raise / 2x15 / 8kg 60s / progress: none\n\n## Lower A\n// Brace.\n// Target: 2 RIR\nSquat / 3x5 / 102.5kg 240s\n// Target: 2 RIR\nLeg Press / 2x10 / 160kg 120s\nPull Up / 2x8 / 0kg\n\n\n# Week 3\n## Upper A\n// Target: 4 RIR\nBench Press / 2x7 / 70kg 180s / progress: none\nLat Pulldown / 2x10 / 47.5kg 90s / superset: A / progress: none\n//\nBicep Curl, Cable / 1x12 / 15kg @7 60s / superset: A / progress: none\n\n## Lower A\n// Target: 4 RIR\nSquat / 2x5 / 85kg 240s / progress: lp(2.5kg)\n//\nLeg Press / 1x10 / 120kg 120s / progress: none\n\n\n"
+  }
+}
