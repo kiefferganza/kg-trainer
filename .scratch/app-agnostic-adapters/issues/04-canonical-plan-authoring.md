@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] Validation rejects unknown exercise names (shipped or personal map), malformed Progression Rules, and barbell, smith-machine, EZ-bar or trap-bar loads that are not multiples of 2.5 kg, naming each failure
-- [ ] Stats prints weekly working sets per muscle from the muscle map, so no one counts by hand
-- [ ] Rendering writes the human-readable plan, one table per session, and is the only way that file is produced
-- [ ] A plan with a Native Rule validates; its app tag is kept for the compile step
-- [ ] Fixture tests cover a multi-week block with a deload and a per-week override
+- [x] Validation rejects unknown exercise names (shipped or personal map), malformed Progression Rules, and barbell, smith-machine, EZ-bar or trap-bar loads that are not multiples of 2.5 kg, naming each failure
+- [x] Stats prints weekly working sets per muscle from the muscle map, so no one counts by hand
+- [x] Rendering writes the human-readable plan, one table per session, and is the only way that file is produced
+- [x] A plan with a Native Rule validates; its app tag is kept for the compile step
+- [x] Fixture tests cover a multi-week block with a deload and a per-week override
