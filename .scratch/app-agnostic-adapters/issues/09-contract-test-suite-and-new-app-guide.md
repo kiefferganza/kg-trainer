@@ -6,7 +6,9 @@
 
 **Status:** ready-for-agent
 
-- [ ] The shared suite discovers every Adapter automatically and runs against both Liftosaur and Hevy
-- [ ] The suite checks Workout Log shape, kg units, logged-only RPE, Capability declarations matching implemented operations, and key-free errors
-- [ ] Liftosaur and Hevy each have a reference doc with Capabilities and a dated verification status
-- [ ] The new-adapter guide exists and a dry run of following it produces a stub that the suite fails in clear, actionable ways
+- [x] The shared suite discovers every Adapter automatically and runs against both Liftosaur and Hevy
+- [x] The suite checks Workout Log shape, kg units, logged-only RPE, Capability declarations matching implemented operations, and key-free errors
+- [x] Liftosaur and Hevy each have a reference doc with Capabilities and a dated verification status
+- [x] The new-adapter guide exists and a dry run of following it produces a stub that the suite fails in clear, actionable ways
+
+**Done 2026-11-07.** `tests/test_contract.py` runs on `contract.names()` with a per-Adapter fixture provider in `tests/contract_fixtures/<app>.py`. The guide is `references/adapters/README.md`; reference docs are `references/adapters/{liftosaur,hevy}/README.md`. Dry run: a naive stub Adapter (scaffolded from an imaginary API, kept outside the repo) failed the suite with messages naming each fix: no fixture provider; declared-but-missing `compile`/`get_plan`; implemented-but-undeclared `find_exercise`; `ping` without `units`; missing Workout Log fields; oldest-first history; pounds returned as kg; no `rpe_logged`; a swallowed HTTP error returned as an empty history; the key printed in an error. The Liftosaur and Hevy Adapters passed unchanged (no Adapter bug found). Left for ticket 10: SKILL.md still points at the old `references/liftosaur-api.md` and `references/liftoscript.md` paths (lines 15 and 97).

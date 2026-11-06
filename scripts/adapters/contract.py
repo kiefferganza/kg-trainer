@@ -39,12 +39,26 @@ OPERATIONS = tuple(FALLBACKS)
 
 _NOT_ADAPTERS = {"http", "contract"}
 
+# Where Adapters are looked for: this package's own directory, plus whatever a test
+# adds with add_adapter_dir() (a throwaway stub Adapter for the contract suite).
+# Nothing in a user's store or environment ever extends it: Adapters are built in
+# the skill repo.
+ADAPTER_DIRS: list[pathlib.Path] = [pathlib.Path(__file__).resolve().parent]
+
+
+def add_adapter_dir(path) -> None:
+    """TEST SEAM. Make the modules in `path` discoverable as Adapters."""
+    import adapters  # the package this module belongs to
+    path = pathlib.Path(path).resolve()
+    if path not in ADAPTER_DIRS:
+        ADAPTER_DIRS.append(path)
+        adapters.__path__.append(str(path))
+
 
 def names() -> list[str]:
-    """Module names of every shipped Adapter, sorted."""
-    root = pathlib.Path(__file__).resolve().parent
-    return sorted(m.name for m in pkgutil.iter_modules([str(root)])
-                  if m.name not in _NOT_ADAPTERS and not m.name.startswith("_"))
+    """Module names of every Adapter, sorted."""
+    return sorted({m.name for m in pkgutil.iter_modules([str(d) for d in ADAPTER_DIRS])
+                   if m.name not in _NOT_ADAPTERS and not m.name.startswith("_")})
 
 
 def load(name: str):

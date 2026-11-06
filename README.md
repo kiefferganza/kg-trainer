@@ -242,7 +242,7 @@ skill's own directory.
 Settings → API Keys.
 
 **`422` on `program-push`** — the Liftoscript does not parse. Run `program-stats` or `playground`
-on the file to locate the error; `references/liftoscript.md` has the syntax.
+on the file to locate the error; `references/adapters/liftosaur/liftoscript.md` has the syntax.
 
 **`No built-in exercise matches`** — Liftosaur names carry equipment as a suffix
 (`Bicep Curl, Cable`). Try a shorter pattern, or create a custom exercise in the app.
@@ -274,8 +274,8 @@ database. The fix is a more standard exercise name, not a nearly-right photo.
 - **Weigh-ins carry their unit** (`69.9kg`, `154lb`). A value with no unit is skipped rather than
   assumed, and each weigh-in is dated in your local time zone.
 
-`references/liftosaur-api.md`, `references/liftohistory.md` and `references/liftoscript.md` are the
-vendored references, refreshed by `scripts/fetch_reference.py`.
+`liftosaur-api.md`, `liftohistory.md` and `liftoscript.md` live in `references/adapters/liftosaur/`;
+`liftohistory.md` and `liftoscript.md` are vendored and refreshed by `scripts/fetch_reference.py`.
 
 ---
 
@@ -300,9 +300,9 @@ If you paste a key into a chat, revoke it in Settings → API Keys afterwards.
 SKILL.md                         the skill itself — seven steps, gates, red flags
 README.md                        this file
 .env.example                     template for the API key
-references/liftosaur-api.md      endpoint map and pagination
-references/liftohistory.md       the workout record format
-references/liftoscript.md        the program language
+references/adapters/README.md    how to add an app (the new-adapter guide)
+references/adapters/liftosaur/   Liftosaur README, API map, Liftohistory, Liftoscript
+references/adapters/hevy/        Hevy README and exercise map
 references/exercises.txt         Liftosaur's built-in exercise names
 references/exercise-muscles.json built-in exercise -> primary muscle, for the balance table
 references/programming.md        volume landmarks, discipline templates, TDEE math
