@@ -156,3 +156,29 @@ def test_the_key_never_appears_in_any_failure_output(monkeypatch, store, capsys)
     everything = "\n".join(outputs) + captured.out + captured.err
     assert "401" in everything and "GET /w" in everything
     assert KEY not in everything
+
+
+def test_auth_header_and_unwrap_are_configurable(monkeypatch):
+    seen = {}
+
+    class R:
+        status = 200
+
+        def read(self):
+            return b'{"page_count": 1}'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def opener(req, timeout=None):
+        seen.update({k.lower(): v for k, v in req.header_items()})
+        return R()
+
+    monkeypatch.setattr(apphttp.OPENER, "open", opener)
+    status, payload = apphttp.request("hevy", "https://h.example", "GET", "/w",
+                                      key="K", auth=apphttp.header_auth("api-key"))
+    assert seen["api-key"] == "K" and "authorization" not in seen
+    assert apphttp.check(status, payload, "GET /w", unwrap=False) == {"page_count": 1}

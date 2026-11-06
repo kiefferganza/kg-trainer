@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "note": "SEED map, hand-reviewed, titles only (id null until a live build). Rebuild with `python scripts/adapters/hevy.py build-map` against the real catalogue. Canonical names are keys of references/exercise-muscles.json; a bare name is that exercise's default equipment.",
+  "exercises": {
+    "Bench Press": {"title": "Bench Press (Barbell)", "id": null},
+    "Bench Press, Dumbbell": {"title": "Bench Press (Dumbbell)", "id": null},
+    "Incline Bench Press": {"title": "Incline Bench Press (Barbell)", "id": null},
+    "Incline Bench Press, Dumbbell": {"title": "Incline Bench Press (Dumbbell)", "id": null},
+    "Squat": {"title": "Squat (Barbell)", "id": null},
+    "Deadlift": {"title": "Deadlift (Barbell)", "id": null},
+    "Romanian Deadlift": {"title": "Romanian Deadlift (Barbell)", "id": null},
+    "Overhead Press": {"title": "Overhead Press (Barbell)", "id": null},
+    "Bent Over Row": {"title": "Bent Over Row (Barbell)", "id": null},
+    "Lat Pulldown": {"title": "Lat Pulldown (Cable)", "id": null},
+    "Seated Row": {"title": "Seated Row (Cable)", "id": null},
+    "Bicep Curl": {"title": "Bicep Curl (Dumbbell)", "id": null},
+    "Bicep Curl, Cable": {"title": "Bicep Curl (Cable)", "id": null},
+    "Lateral Raise": {"title": "Lateral Raise (Dumbbell)", "id": null},
+    "Leg Press": {"title": "Leg Press (Machine)", "id": null},
+    "Pull Up": {"title": "Pull Up", "id": null}
+  }
+}
