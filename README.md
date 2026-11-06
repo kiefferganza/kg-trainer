@@ -127,7 +127,7 @@ Say any of these to Claude:
 ### The weekly check-in
 
 ```bash
-~/.claude/skills/kg-trainer/scripts/checkin.py import-liftosaur   # or: log-weight 2026-10-11 70.3
+~/.claude/skills/kg-trainer/scripts/checkin.py import-app   # or: log-weight 2026-10-11 70.3
 ~/.claude/skills/kg-trainer/scripts/checkin.py trend --calories 2650
 ```
 
@@ -177,7 +177,7 @@ deep-dive <pattern>  one lift, every logged set, ranked by estimated 1RM
 
 ```
 log-weight <date> <kg> [--fat --waist]
-import-liftosaur                   pull weigh-ins from Liftosaur into the local log
+import-app                         pull weigh-ins from the Active App into the local log
 trend [--window 7] [--calories N]  weekly averages, rate, noise, observed TDEE
 record --calories --protein --carbs --fat [--sessions --planned --notes]
 history [--last N]                 past check-ins

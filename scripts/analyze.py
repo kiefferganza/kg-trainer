@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Baseline analysis of a Liftosaur training history.
+"""Baseline analysis of the Active App's training history.
 
 Caches the full log locally, then computes the numbers a coach needs. Every
 figure here comes from logged sets — nothing is estimated or remembered.
@@ -26,11 +26,9 @@ import statistics
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-import liftosaur  # noqa: E402  — reuse the one API client
 import paths  # noqa: E402
 from adapters import contract  # noqa: E402
 from fetch_reference import MUSCLES, muscle_for  # noqa: E402
-from liftohistory import parse_liftohistory  # noqa: E402
 
 STATE = paths.state_dir()
 DATA = STATE / "data"
@@ -86,22 +84,6 @@ def save_workouts(ws: list[dict]):
             f.write(json.dumps(w) + "\n")
 
 
-def pull_bodyweight() -> int:
-    """Rewrite MEASUREMENTS from the full weight series: one row per day, latest wins."""
-    by_day: dict[str, tuple] = {}
-    for v in liftosaur.paginate("/measurements/weight", "values"):
-        read = liftosaur.weigh_in(v)
-        if read is None:
-            continue
-        day, kg = read[0].isoformat(), read[1]
-        ts = v.get("timestamp") or 0
-        if day not in by_day or ts > by_day[day][0]:
-            by_day[day] = (ts, kg)
-    rows = [{"date": d, "weight_kg": kg} for d, (_, kg) in sorted(by_day.items())]
-    MEASUREMENTS.write_text(json.dumps(rows, indent=2))
-    return len(rows)
-
-
 def pull_through_adapter(adapter):
     """Replace the cache from an Adapter's Workout Log (kg, Canonical Exercise
     Names) and, when it declares pull_bodyweight, its weigh-ins (one per day)."""
@@ -121,36 +103,15 @@ def pull_through_adapter(adapter):
 
 
 def cmd_pull(a):
-    """Re-read the whole history and replace the cache with it.
+    """Re-read the whole history through the Active App's Adapter and replace
+    the cache with it.
 
-    Liftosaur pages 200 records at a time, so a full read is a few requests.
     Replacing rather than merging is what keeps the cache honest: a session
     logged late with an earlier date, a session whose time was edited, a
-    deleted session, and rows left by an older backend all come out right.
+    deleted session, and rows left by another app all come out right.
     `--full` is accepted for compatibility; every pull is full.
-
-    When profile.json names another Active App, the pull goes through that
-    Adapter instead (see pull_through_adapter).
     """
-    app = contract.active_app()
-    if app not in (None, "liftosaur"):
-        return pull_through_adapter(contract.load(app))
-    records = liftosaur.paginate("/history", "records")
-
-    parsed: list[dict] = []
-    for record in records:
-        for workout in parse_liftohistory(record.get("text") or ""):
-            workout["id"] = record.get("id")
-            parsed.append(workout)
-
-    previous = len(load_workouts())
-    save_workouts(parsed)
-
-    DATA.mkdir(parents=True, exist_ok=True)
-    weigh_ins = pull_bodyweight()
-    SYNC.write_text(json.dumps({"last_pull": now_iso()}))
-    print(f"{len(parsed)} workouts parsed from {len(records)} records "
-          f"(cache held {previous}); {weigh_ins} weigh-in days -> {DATA}")
+    pull_through_adapter(contract.active_adapter())
 
 
 def epley(weight, reps):
