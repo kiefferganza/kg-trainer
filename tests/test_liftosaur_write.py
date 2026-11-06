@@ -274,11 +274,13 @@ def test_a_push_without_an_id_fails_and_records_nothing(store, api, planfile):
 
 def test_update_and_get_go_through_the_cli(store, api, planfile, capsys):
     api.routes[("PUT", "/programs/current")] = {"data": {"id": "p3"}}
-    api.routes[("GET", "/programs/current")] = {"data": {"id": "p3", "name": "C", "text": "# Week 1"}}
+    # the drift guard fetches the program first: here the app holds exactly what the plan compiles to
+    api.routes[("GET", "/programs/current")] = {"data": {"id": "p3", "name": "C",
+                                                         "text": GOLDEN.read_text()}}
     app.cmd_update(ns(plan=planfile, id="current", week=None, yes=True))
     app.cmd_get(ns(id="current"))
     out = capsys.readouterr().out
-    assert "Updated liftosaur plan p3" in out and '"text": "# Week 1"' in out
+    assert "Updated liftosaur plan p3" in out and '"name": "C"' in out
 
 
 def run_check(planfile, capsys):

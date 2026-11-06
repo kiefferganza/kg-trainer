@@ -31,6 +31,9 @@ from liftohistory import parse_liftohistory  # noqa: E402
 NAME = "liftosaur"
 CAPABILITIES = {"ping", "pull_history", "pull_bodyweight", "find_exercise",
                 "compile", "push_plan", "update_plan", "get_plan", "check"}
+# Liftosaur runs Progression Rules itself, so `app.py update` guards against drift:
+# see prescriptions() and the contract module.
+NATIVE_PROGRESSION = True
 
 BASE = "https://www.liftosaur.com/api/v1"
 EXERCISES = pathlib.Path(__file__).resolve().parent.parent.parent / "references" / "exercises.txt"
@@ -296,6 +299,98 @@ def compile(plan: dict, week: int | None = None) -> str:
                 out.append(" / ".join(parts))
             out.append("")
     return "\n".join(out).rstrip("\n") + "\n"
+
+
+# --- reading a program back: the drift guard's side of the comparison -------
+#
+# Liftosaur reformats stored text (`3x7 / 80kg 180s`, `///` lines dropped, weights
+# moved between the sets part and a trailing part), so drift is compared on parsed
+# prescriptions, never on text.
+
+_WEEK_RE = re.compile(r"^#\s+(?:Week\s+)?(\d+)\b", re.I)
+_SCHEME_RE = re.compile(r"^(\d+)x(\d+)(\+?)$")
+_KEY_RE = re.compile(r"^[A-Za-z][\w ]*:")        # `warmup: ...`, `progress: ...`, `superset: A`
+_LB_TO_KG = 0.45359237
+
+
+def _load_token(token: str):
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)(kg|lb)", token)
+    if not m:
+        return None
+    value = float(m[1])
+    return round(value * _LB_TO_KG, 2) if m[2] == "lb" else value
+
+
+def _parse_sets(part: str):
+    """[(count, reps, load_kg | None, amrap)] for a `3x8 80kg, 1x10+ 60kg` part; None
+    when the part is not a sets part. A group with no load of its own has load None."""
+    groups = []
+    for group in part.split(","):
+        tokens = group.split()
+        if not tokens:
+            return None
+        m = _SCHEME_RE.match(tokens[0])
+        if not m:
+            return None
+        load = next((l for l in map(_load_token, tokens[1:]) if l is not None), None)
+        groups.append((int(m[1]), int(m[2]), load, m[3] == "+"))
+    return groups
+
+
+def _exercise_line(line: str):
+    """(name, [(reps, load_kg | None, amrap), ...]) for one exercise line, or None."""
+    parts = [p.strip() for p in line.split(" / ")]
+    groups, default = None, None
+    for part in parts[1:]:
+        if _KEY_RE.match(part):
+            continue
+        if groups is None:
+            groups = _parse_sets(part)
+            continue
+        if default is None:       # `80kg 180s` / `20kg @8 60s` after the sets part
+            default = next((l for l in map(_load_token, part.split()) if l is not None), None)
+    if groups is None:
+        return None
+    sets = []
+    for count, reps, load, amrap in groups:
+        sets += [(reps, load if load is not None else default, amrap)] * count
+    return parts[0], sets
+
+
+def parse_program(text: str) -> dict[int, list[tuple]]:
+    """{week: [(day, exercise, [(reps, load_kg | None, amrap), ...]), ...]} from
+    Liftoscript. Warmups, `//` and `///` lines, timers, `@rpe`, superset and progress
+    fields (including a multi-line `custom() {~ ... ~}`) are ignored. A program with
+    no `# Week` headers is one week, number 1."""
+    weeks: dict[int, list] = {}
+    week, day, in_script = 1, None, False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if in_script:
+            in_script = "~}" not in line
+            continue
+        if "{~" in line and "~}" not in line.split("{~", 1)[1]:
+            in_script = True
+        if not line or line.startswith("//"):
+            continue
+        m = _WEEK_RE.match(line)
+        if m:
+            week, day = int(m[1]), None
+            weeks.setdefault(week, [])
+            continue
+        if line.startswith("#"):
+            day = line.lstrip("#").strip()
+            weeks.setdefault(week, [])
+            continue
+        parsed = _exercise_line(line)
+        if parsed and day is not None:
+            weeks.setdefault(week, []).append((day, parsed[0], parsed[1]))
+    return weeks
+
+
+def prescriptions(payload: dict, week: int):
+    """The working sets of `week` in a `get_plan` payload (contract.drift's shape)."""
+    return parse_program(payload.get("text") or "").get(week)
 
 
 # --- programs and the playground (raw calls) -------------------------------

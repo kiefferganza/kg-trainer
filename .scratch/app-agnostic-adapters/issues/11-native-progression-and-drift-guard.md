@@ -9,10 +9,10 @@
 
 **Status:** ready-for-agent
 
-- [ ] `plan.py progress` applies a fired rule's change to the exercise in every later week of the block, deload weeks included, and keeps each week's authored offset
-- [ ] The offline agreement test compares every week of the recorded `updatedProgramText` for Bench Press and Lat Pulldown, not only week 1, and passes
-- [ ] Hold, miss and no-log behaviour from ticket 07 is unchanged
-- [ ] The Liftosaur Adapter declares native progression; Hevy does not
-- [ ] `app.py update` on a native-progression app refuses on drift, shows the app's and the Canonical Plan's prescriptions side by side, and writes only with the override flag
-- [ ] The drift comparison parses Liftosaur's reformatted program text (covered by a fixture taken from a live `get`)
-- [ ] With no drift, update proceeds as before
+- [x] `plan.py progress` applies a fired rule's change to the exercise in every later week of the block, deload weeks included, and keeps each week's authored offset
+- [x] The offline agreement test compares every week of the recorded `updatedProgramText` for Bench Press and Lat Pulldown, not only week 1, and passes
+- [x] Hold, miss and no-log behaviour from ticket 07 is unchanged
+- [x] The Liftosaur Adapter declares native progression; Hevy does not
+- [x] `app.py update` on a native-progression app refuses on drift, shows the app's and the Canonical Plan's prescriptions side by side, and writes only with the override flag
+- [x] The drift comparison parses Liftosaur's reformatted program text (covered by a fixture taken from a live `get`)
+- [x] With no drift, update proceeds as before

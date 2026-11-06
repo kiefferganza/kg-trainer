@@ -22,6 +22,8 @@ Each module declares `NAME` (its module name, e.g. `acme`) and `CAPABILITIES` (t
 
 Declare exactly what you implement. `CAPABILITIES` is how the CLI knows what to refuse: a declared operation that is missing, or an implemented one that is not declared, fails the suite.
 
+**Native progression (optional).** If the app runs Progression Rules itself (it moves the weights when the athlete finishes a workout), declare `NATIVE_PROGRESSION = True` (a bool; absent means False) and define `prescriptions(payload, week)`: from a `get_plan` payload, the working sets the app prescribes for one week as `[(day, exercise, [(reps, load_kg | None, amrap), ...])]` in program order, or `None` when the program has no such week. Ignore warmups, comments, timers, supersets and progress fields, and parse rather than compare text: apps reformat what you send. It needs `compile`, `update_plan` and `get_plan` declared. `app.py update` then fetches the program first and refuses, showing both sides, when the plan's `current_week` differs from the Canonical Plan; `--force` writes anyway after printing the difference. `plan.py progress` records the same change in the Canonical Plan, so a plan that is kept up with `progress` does not drift. The suite checks the flag is a bool, that `prescriptions(compile(plan))` shows no drift against the plan in every week, and that a changed rep count shows as drift (`contract.drift`, `contract.plan_prescriptions`).
+
 Rules every Adapter follows:
 
 - It is the only code that knows its app's URLs, payloads, pagination and quirks. Expose the base URL as `BASE` (the boundary test uses it to keep that URL out of every other module).

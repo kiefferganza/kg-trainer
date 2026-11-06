@@ -261,6 +261,44 @@ def test_no_implemented_operation_is_undeclared(env):
         "the functions if they are not contract operations")
 
 
+def test_native_progression_is_a_bool_and_comes_with_a_drift_reader(env):
+    a = env.adapter
+    declared = getattr(a, "NATIVE_PROGRESSION", False)
+    assert isinstance(declared, bool), (
+        f"NATIVE_PROGRESSION must be True or False (or absent), got {declared!r}")
+    if not declared:
+        return
+    missing = [o for o in ("compile", "update_plan", "get_plan") if o not in a.CAPABILITIES]
+    assert not missing, (
+        f"NATIVE_PROGRESSION = True needs {missing} in CAPABILITIES: the drift guard fetches "
+        "the app's program with get_plan before update_plan writes")
+    assert callable(getattr(a, "prescriptions", None)), (
+        "NATIVE_PROGRESSION = True needs prescriptions(payload, week): the working sets "
+        f"the app prescribes, as [(day, exercise, [(reps, load_kg, amrap)])] ({GUIDE})")
+
+
+def test_a_native_progression_app_reads_back_what_it_was_sent_without_drift(env):
+    if not contract.native_progression(env.adapter):
+        pytest.skip("no native progression")
+    plan = env.plan()
+    week = plan["current_week"]
+    sent = {"id": "x", "name": "n", "text": env.adapter.compile(plan)}
+    for wk in plan["weeks"]:
+        app_side = env.adapter.prescriptions(sent, wk["number"])
+        assert app_side is not None, f"prescriptions() found no week {wk['number']} in the compile"
+        assert contract.drift(app_side, contract.plan_prescriptions(plan, wk["number"])) == [], (
+            f"week {wk['number']}: prescriptions(compile(plan)) must equal the plan's own working "
+            "sets, or every update would be refused as drift")
+    # one more rep on a working set is seen as drift, in that exercise only
+    moved = copy.deepcopy(plan)
+    ex = next(w for w in moved["weeks"] if w["number"] == week)["days"][0]["exercises"][0]
+    next(s for s in ex["sets"] if s["kind"] != "warmup")["reps"] += 1
+    changed = {"id": "x", "name": "n", "text": env.adapter.compile(moved)}
+    rows = contract.drift(env.adapter.prescriptions(changed, week),
+                          contract.plan_prescriptions(plan, week))
+    assert [r[1] for r in rows] == [ex["exercise"]]
+
+
 def test_operation_signatures_follow_the_contract(env):
     for name in env.ops():
         if not callable(getattr(env.adapter, name, None)):

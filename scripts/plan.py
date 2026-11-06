@@ -11,7 +11,7 @@ Usage:
   plan.py render <plan>          # write meso-NN.md next to the plan
   plan.py progress <plan> [--since YYYY-MM-DD] [--dry-run]
                                  # apply each rule to what was logged in current_week,
-                                 # write week current_week+1, advance current_week
+                                 # carry the changes into every later week, advance current_week
 
 Equipment for the 2.5 kg rule is read from the Canonical Exercise Name suffix
 (", Barbell", ", Smith Machine", ", EZ Bar", ", Trap Bar"). A few names carry no
@@ -393,7 +393,7 @@ def cmd_render(a):
     return 0
 
 
-# --- progress: the skill, not the app, moves the prescriptions on --------------
+# --- progress: record (or, without native progression, make) the weight changes ---
 #
 # Matching logged sessions to the plan's days (see progress_plan):
 #   * a plan day is matched by name to a Workout Log session's day_name, ignoring
@@ -506,6 +506,32 @@ def apply_rule(rule: dict, sets: list[dict], logged: list[dict]):
     return new, "progressed", f"{total} total reps >= {rule['total']}: +{_kg(inc)} kg on each"
 
 
+def _deltas(before: list[dict], after: list[dict]) -> list[tuple]:
+    """Per working set: (reps change, load change) a rule made. A set with no load has none."""
+    return [(a["reps"] - b["reps"],
+             None if b.get("load_kg") is None else round(a["load_kg"] - b["load_kg"], 3))
+            for b, a in zip(before, after)]
+
+
+def _apply_later(weeks: list[dict], day_name: str, exercise: str, deltas: list[tuple]) -> None:
+    """Add a rule's per-set changes to the exercise's working sets in each of `weeks`,
+    keeping what each week authored (its own reps and loads). Set i takes change i;
+    sets beyond the last change take the last one."""
+    for wk in weeks:
+        for d in wk["days"]:
+            if d["name"] != day_name:
+                continue
+            for ex in d["exercises"]:
+                if ex["exercise"] != exercise:
+                    continue
+                work = [s for s in ex["sets"] if s["kind"] != "warmup"]
+                for i, s in enumerate(work):
+                    dreps, dload = deltas[min(i, len(deltas) - 1)]
+                    s["reps"] = max(1, s["reps"] + dreps)
+                    if s.get("load_kg") is not None and dload is not None:
+                        s["load_kg"] = round(max(0, s["load_kg"] + dload), 3)
+
+
 def progress_plan(plan: dict, workouts: list[dict], since: str | None = None):
     """Apply each exercise's rule to what was logged in current_week.
 
@@ -514,9 +540,17 @@ def progress_plan(plan: dict, workouts: list[dict], since: str | None = None):
     "held", "unchanged"), why, before (what week current_week+1 said), after.
     When no session of the week was logged, every prescription is held, `info
     ["advanced"]` is False and the plan comes back unchanged (current_week stays).
-    A week current_week+1 that is a deload keeps its own prescriptions.
+    A rule that fires changes the exercise in current_week itself and in every later
+    week (deloads included), each keeping its authored offset: it adds the change to
+    that week's own reps and load, as Liftosaur's updated program text shows. A hold repeats this week's
+    prescription into the next week only, and never into a deload. A deload or `none` in current_week only
+    means finishing it triggers nothing.
     """
     out = copy.deepcopy(plan)
+    for w in out["weeks"]:        # one dict per set: a caller may have repeated one object
+        for d in w["days"]:
+            for e in d["exercises"]:
+                e["sets"] = [dict(s) for s in e["sets"]]
     cur = out["current_week"]
     wk = next(w for w in out["weeks"] if w["number"] == cur)
     nxt = next((w for w in out["weeks"] if w["number"] == cur + 1), None)
@@ -540,7 +574,8 @@ def progress_plan(plan: dict, workouts: list[dict], since: str | None = None):
                    "action": "unchanged", "why": "",
                    "before": _prescription(_working(target["sets"])) if target else "-"}
             rows.append(row)
-            written = None  # the working sets to put into the next week, if any
+            current = _working(ex["sets"])
+            written = None  # on a hold: this week's prescription, repeated into the next week
             if rule is None:
                 row["why"] = "deload week: progression off" if wk["deload"] else "no Progression Rule"
             elif "native" in rule:
@@ -549,12 +584,7 @@ def progress_plan(plan: dict, workouts: list[dict], since: str | None = None):
                 row["why"] = "rule none: next week stays as planned"
             elif not advanced:
                 row.update(action="held", why=f"no session logged in week {cur} since {floor}")
-            elif target is None:
-                row["why"] = f"not in week {cur + 1} {day['name']}"
-            elif nxt["deload"]:
-                row["why"] = f"week {cur + 1} is a deload: its prescription is kept"
             else:
-                current = _working(ex["sets"])
                 logged = _logged_sets(session, name) if session else None
                 if session is None:
                     row.update(action="held", why=f"{day['name']} not logged")
@@ -563,9 +593,16 @@ def progress_plan(plan: dict, workouts: list[dict], since: str | None = None):
                 elif len(logged) < len(current):
                     row.update(action="held", why=f"partial: {len(logged)} of {len(current)} sets logged")
                 else:
-                    written, action, why = apply_rule(rule, current, logged)
+                    changed, action, why = apply_rule(rule, current, logged)
                     row.update(action=action, why=why)
-                if written is None or row["action"] == "held":
+                    if action == "progressed":
+                        # The app's semantics (tests/fixtures/playground_finish.json): the
+                        # change reaches this exercise in the week just done and in every
+                        # later week, deloads included, each keeping its authored offset.
+                        deltas = _deltas(current, changed)
+                        _apply_later([w for w in out["weeks"] if w["number"] >= cur],
+                                     day["name"], name, deltas)
+                if row["action"] == "held" and advanced and target is not None and not nxt["deload"]:
                     written = [copy.deepcopy(s) for s in current]  # hold: repeat this week's prescription
             if written is not None:
                 target["sets"] = [s for s in target["sets"] if s["kind"] == "warmup"] + written
@@ -616,7 +653,7 @@ def cmd_progress(a):
         print(f"\n--dry-run: {p} not written. It would advance current_week to {new['current_week']}.")
         return 0
     _write_json(p, new)
-    print(f"\nWrote week {info['next_week']} into {p}; current_week is now {new['current_week']}. "
+    print(f"\nWrote week {info['next_week']} and later weeks into {p}; current_week is now {new['current_week']}. "
           "Nothing was sent to the app: run `app.py update` to push it.")
     return 0
 
