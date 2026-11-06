@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a static training dashboard from the cached Liftosaur log.
+"""Generate a static training dashboard from the cached Workout Log and the plan on disk.
 
 Writes kg-trainer-data/dashboard/{index.html,data.js,img/*}. It opens straight
 from the filesystem — no server, and no API key ever reaches the output.
@@ -25,8 +25,8 @@ import urllib.request
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import analyze  # noqa: E402
-import liftosaur  # noqa: E402
 import paths  # noqa: E402
+import plan as canonical  # noqa: E402
 
 STATE = paths.state_dir()
 OUT = STATE / "dashboard"
@@ -135,6 +135,44 @@ def program_sessions(program_text: str) -> list[dict]:
             keep = [parts[0]] + [p for p in parts[1:] if not p.startswith(_DROPPED_SECTIONS)]
             sessions[-1]["exercises"].append(" / ".join(p for p in keep if p))
     return sessions
+
+
+def _newest(plans: pathlib.Path, pattern: str) -> pathlib.Path | None:
+    found = sorted(plans.glob(pattern), key=lambda f: f.name)
+    return found[-1] if found else None
+
+
+def canonical_sessions(plan: dict) -> list[dict]:
+    """One session per week and day of a Canonical Plan: (title, rx, cue) per exercise."""
+    return [{"week": f"Week {wk['number']}", "day": day["name"],
+             "exercises": [(ex["exercise"], canonical._prescription(ex["sets"]) or "—",
+                            ex.get("cue") or "") for ex in day["exercises"]]}
+            for wk in plan["weeks"] for day in wk["days"]]
+
+
+def plan_sessions(plans: pathlib.Path) -> list[dict]:
+    """The plan tabs' sessions, read from disk with no API call.
+
+    The newest plans/meso-NN.plan.json wins; a store without one falls back to
+    the newest plans/*.liftoscript. Neither present (or readable) gives [].
+    """
+    f = _newest(plans, "meso-*.plan.json")
+    if f:
+        try:
+            return canonical_sessions(json.loads(f.read_text()))
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+    f = _newest(plans, "*.liftoscript")
+    if not f:
+        return []
+    out = []
+    for s in program_sessions(f.read_text()):
+        exs = []
+        for line in s["exercises"]:
+            title, _, rx = (p.strip() for p in line.partition(" / "))
+            exs.append((title, rx, ""))
+        out.append({**s, "exercises": exs})
+    return out
 
 
 def build(a):
@@ -267,30 +305,24 @@ def build(a):
                 "caption": f"estimated 1RM · {top['exercise']} · {top['date']}",
                 "images": imgs(top["exercise"])}
 
-    # --- the plan, from the current Liftosaur program
-    routines = []
-    try:
-        program = liftosaur.ok(*liftosaur.call("GET", "/programs/current"),
-                               "GET /programs/current")
-        live = program_sessions((program or {}).get("text") or "")
-    except SystemExit:
-        live = []
+    # --- the plan, from disk: the Canonical Plan, else the newest Liftoscript file
+    sessions = plan_sessions(STATE / "plans")
     last_lift: dict[str, tuple[str, dict]] = {}
     for w in ws:
         for e in w.get("exercises", []):
             for s in e.get("sets", []):
                 if s.get("type") != "warmup" and s.get("weight_kg"):
                     last_lift[e["title"]] = (w["start_time"][:10], s)
-    for session in live:
+    routines = []
+    for session in sessions:
         exs = []
-        for line in session["exercises"]:
-            title, _, rx = (p.strip() for p in line.partition(" / "))
+        for title, rx, cue in session["exercises"]:
             prev = last_lift.get(title)
             exs.append({
                 "name": title, "rx": rx or "—",
                 "last": (f"last did {kg(prev[1]['weight_kg'])} kg × {prev[1].get('reps') or '?'}"
                          f" on {prev[0]}") if prev else "no logged history",
-                "cue": "",
+                "cue": cue,
                 "images": imgs(title),
                 "tip": f"<b>{title}</b><br>{rx or '—'}",
             })

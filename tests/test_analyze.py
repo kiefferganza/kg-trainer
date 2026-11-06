@@ -6,6 +6,8 @@ import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "scripts"))
 import analyze
+from adapters import contract
+from adapters import liftosaur as client
 from liftohistory import parse_liftohistory
 
 FIX = pathlib.Path(__file__).resolve().parent / "fixtures" / "history_sample.txt"
@@ -23,6 +25,9 @@ def store(tmp_path, monkeypatch):
     monkeypatch.setattr(analyze, "WORKOUTS", tmp_path / "workouts.jsonl")
     monkeypatch.setattr(analyze, "SYNC", tmp_path / "sync.json")
     monkeypatch.setattr(analyze, "MEASUREMENTS", tmp_path / "measurements.json")
+    profile = tmp_path / "profile.json"
+    profile.write_text('{"app": {"name": "liftosaur"}}')
+    monkeypatch.setattr(contract, "profile_path", lambda: profile)
     return tmp_path
 
 
@@ -78,7 +83,7 @@ def test_best_sets_are_keyed_by_exercise_title(workouts):
 
 def test_pull_writes_records_with_their_api_id(store, monkeypatch):
     records = [{"id": "r1", "text": FIX.read_text()}]
-    monkeypatch.setattr(analyze.liftosaur, "paginate", lambda *a, **k: records)
+    monkeypatch.setattr(client, "paginate", lambda *a, **k: records)
 
     analyze.cmd_pull(type("A", (), {"full": True})())
 
@@ -99,7 +104,7 @@ def test_pull_always_reads_the_whole_history(store, monkeypatch):
             seen.append(dict(params or {}))
         return []
 
-    monkeypatch.setattr(analyze.liftosaur, "paginate", fake_paginate)
+    monkeypatch.setattr(client, "paginate", fake_paginate)
     analyze.cmd_pull(type("A", (), {"full": False})())
     assert seen == [{}]
 
@@ -112,7 +117,7 @@ def test_pull_replaces_rows_from_an_older_cache(store, monkeypatch):
              {"id": "r1", "start_time": "2026-08-31T09:00:00Z", "exercises": []}]
     (store / "workouts.jsonl").write_text("".join(json.dumps(w) + "\n" for w in stale))
     records = [{"id": "r1", "text": FIX.read_text()}]
-    monkeypatch.setattr(analyze.liftosaur, "paginate",
+    monkeypatch.setattr(client, "paginate",
                         lambda path, *a, **k: records if path == "/history" else [])
 
     analyze.cmd_pull(type("A", (), {"full": False})())
@@ -133,7 +138,7 @@ def test_pull_writes_bodyweight_from_the_weight_series(store, monkeypatch):
     def fake_paginate(path, key, params=None, **kw):
         return WEIGHTS if path == "/measurements/weight" else []
 
-    monkeypatch.setattr(analyze.liftosaur, "paginate", fake_paginate)
+    monkeypatch.setattr(client, "paginate", fake_paginate)
     analyze.cmd_pull(type("A", (), {"full": True})())
 
     meas = json.loads((store / "measurements.json").read_text())
