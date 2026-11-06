@@ -8,12 +8,12 @@ Start from the Hevy facts recorded in the spec (restored from git history at `a9
 
 **Status:** ready-for-agent
 
-- [ ] Each Adapter declares its Capabilities; asking for an undeclared one prints its Fallback and exits non-zero
-- [ ] Listing apps shows Liftosaur and Hevy with their Capabilities; choosing an app writes it to `profile.json`
-- [ ] Hevy history is pulled through every page (page size 10) and becomes a Workout Log in kg with Canonical Exercise Names; pagination that does not terminate fails loudly
-- [ ] Only RPE the athlete logged reaches the Workout Log
-- [ ] Hevy bodyweight becomes one reading per day
-- [ ] A shipped Hevy exercise map exists, built from Hevy's catalogue and reviewed; the store's personal override wins over it
-- [ ] The baseline report runs on a Hevy store, with recorded-fixture tests
-- [ ] The `liftosaur` → `app` profile migration is idempotent and logs once
+- [x] Each Adapter declares its Capabilities; asking for an undeclared one prints its Fallback and exits non-zero
+- [x] Listing apps shows Liftosaur and Hevy with their Capabilities; choosing an app writes it to `profile.json`
+- [x] Hevy history is pulled through every page (page size 10) and becomes a Workout Log in kg with Canonical Exercise Names; pagination that does not terminate fails loudly
+- [x] Only RPE the athlete logged reaches the Workout Log
+- [x] Hevy bodyweight becomes one reading per day
+- [ ] A shipped Hevy exercise map exists, built from Hevy's catalogue and reviewed; the store's personal override wins over it (partial: seed map and builder shipped, override tested; full map needs a live build)
+- [x] The baseline report runs on a Hevy store, with recorded-fixture tests
+- [x] The `liftosaur` → `app` profile migration is idempotent and logs once
 - [ ] Live verification against the user's Hevy account is recorded with a date

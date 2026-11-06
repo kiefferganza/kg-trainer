@@ -102,8 +102,18 @@ def api_key(app: str, *, display: str | None = None, example: str = "...",
              + (f" {hint}" if hint else ""))
 
 
+def bearer(key: str) -> dict:
+    """Default auth: `Authorization: Bearer <key>` (Liftosaur)."""
+    return {"Authorization": f"Bearer {key}"}
+
+
+def header_auth(name: str):
+    """Auth builder for apps that take the key in a plain header, e.g. `api-key`."""
+    return lambda key: {name: key}
+
+
 def request(app: str, base: str, method: str, path: str, params: dict | None = None,
-            body: dict | None = None, *, key: str | None = None, **key_help):
+            body: dict | None = None, *, key: str | None = None, auth=bearer, **key_help):
     """One JSON call as (status, parsed body or None).
 
     HTTP error statuses (including refused redirects) are returned, not raised, so
@@ -114,8 +124,7 @@ def request(app: str, base: str, method: str, path: str, params: dict | None = N
     if params:
         url += "?" + urllib.parse.urlencode(params)
     data = json.dumps(body).encode() if body is not None else None
-    headers = {"Authorization": f"Bearer {key or api_key(app, **key_help)}",
-               "Accept": "application/json"}
+    headers = {**auth(key or api_key(app, **key_help)), "Accept": "application/json"}
     if data is not None:
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, method=method, headers=headers)
@@ -138,8 +147,9 @@ def request(app: str, base: str, method: str, path: str, params: dict | None = N
                  f"({type(exc).__name__})")
 
 
-def check(status: int, payload, what: str, hints: dict[int, str] | None = None):
-    """Unwrap {"data": ...}, or exit naming `what` and the status. Never echoes the key.
+def check(status: int, payload, what: str, hints: dict[int, str] | None = None,
+          *, unwrap: bool = True):
+    """Unwrap {"data": ...} (or, with unwrap=False, return the payload object), or exit naming `what` and the status. Never echoes the key.
 
     `hints` maps a status to extra advice; any status below 400 (a refused
     redirect) gets the redirect explanation.
@@ -154,4 +164,18 @@ def check(status: int, payload, what: str, hints: dict[int, str] | None = None):
         sys.exit(f"{what} failed: HTTP {status} {detail}{hint}".rstrip())
     if not isinstance(payload, dict):
         sys.exit(f"{what} failed: response was not a JSON object")
-    return payload.get("data")
+    return payload.get("data") if unwrap else payload
+
+
+def key_source(app: str) -> str | None:
+    """Where `app`'s key would come from -- "env", "dotenv" or "file" -- or None.
+    Never returns or prints the key itself."""
+    name = env_name(app)
+    if (os.environ.get(name) or "").strip():
+        return "env"
+    if dotenv_value(name):
+        return "dotenv"
+    key_file = paths.state_dir() / f"{app}-key"
+    if key_file.exists() and key_file.read_text().strip():
+        return "file"
+    return None

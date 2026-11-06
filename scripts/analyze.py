@@ -28,6 +28,7 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import liftosaur  # noqa: E402  — reuse the one API client
 import paths  # noqa: E402
+from adapters import contract  # noqa: E402
 from fetch_reference import MUSCLES, muscle_for  # noqa: E402
 from liftohistory import parse_liftohistory  # noqa: E402
 
@@ -101,6 +102,24 @@ def pull_bodyweight() -> int:
     return len(rows)
 
 
+def pull_through_adapter(adapter):
+    """Replace the cache from an Adapter's Workout Log (kg, Canonical Exercise
+    Names) and, when it declares pull_bodyweight, its weigh-ins (one per day)."""
+    workouts = contract.require(adapter, "pull_history")()
+    previous = len(load_workouts())
+    save_workouts(workouts)
+    DATA.mkdir(parents=True, exist_ok=True)
+    if "pull_bodyweight" in adapter.CAPABILITIES:
+        rows = [{"date": d.isoformat(), "weight_kg": kg} for d, kg in adapter.pull_bodyweight()]
+        MEASUREMENTS.write_text(json.dumps(rows, indent=2))
+    else:  # the cache is replaced wholesale: no stale series from another app
+        rows = []
+        MEASUREMENTS.unlink(missing_ok=True)
+    SYNC.write_text(json.dumps({"last_pull": now_iso()}))
+    print(f"{len(workouts)} workouts pulled from {adapter.NAME} "
+          f"(cache held {previous}); {len(rows)} weigh-in days -> {DATA}")
+
+
 def cmd_pull(a):
     """Re-read the whole history and replace the cache with it.
 
@@ -109,7 +128,13 @@ def cmd_pull(a):
     logged late with an earlier date, a session whose time was edited, a
     deleted session, and rows left by an older backend all come out right.
     `--full` is accepted for compatibility; every pull is full.
+
+    When profile.json names another Active App, the pull goes through that
+    Adapter instead (see pull_through_adapter).
     """
+    app = contract.active_app()
+    if app not in (None, "liftosaur"):
+        return pull_through_adapter(contract.load(app))
     records = liftosaur.paginate("/history", "records")
 
     parsed: list[dict] = []

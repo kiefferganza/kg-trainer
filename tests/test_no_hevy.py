@@ -9,7 +9,8 @@ def test_no_tracked_file_mentions_hevy():
                            text=True, check=True).stdout.split()
     offenders = {}
     for name in files:
-        if name.startswith(("docs/", ".scratch/", "scripts/adapters/", "tests/")) \
+        if name.startswith(("docs/", ".scratch/", "scripts/adapters/", "tests/",
+                            "references/adapters/")) \
                 or name == "GLOSSARY.md":
             continue          # the adapter work names Hevy on purpose; ticket 03 deletes this test
         if name == "tests/test_no_hevy.py":
