@@ -6,10 +6,11 @@
 
 **Status:** ready-for-agent
 
-- [ ] The compiled routines for a fixture plan and week match approved golden payloads
-- [ ] Push handles Hevy's inconsistent response wrappers (object on POST and GET, array on PUT) and returns the folder id
-- [ ] Update strips the fields Hevy's GET returns but its PUT rejects
-- [ ] A 403 on routine creation stops with a clear message and nothing half-written is reported as success
-- [ ] An unmatched exercise blocks the push and lists what needs a custom exercise
-- [ ] Hevy declares no `check`; the CLI says local validate and stats are the only checks
+- [x] The compiled routines for a fixture plan and week match approved golden payloads
+- [x] Push handles Hevy's inconsistent response wrappers (object on POST and GET, array on PUT) and returns the folder id
+- [x] Update strips the fields Hevy's GET returns but its PUT rejects
+- [x] A 403 on routine creation stops with a clear message and nothing half-written is reported as success
+- [x] An unmatched exercise blocks the push and lists what needs a custom exercise
+- [x] Hevy declares no `check`; the CLI says local validate and stats are the only checks
 - [ ] Live verification against the user's Hevy account is recorded with a date
+      deferred: user has no Hevy Pro (2026-11-07); ships fixture-tested and marked unverified

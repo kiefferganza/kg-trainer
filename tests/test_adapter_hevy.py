@@ -109,10 +109,10 @@ def test_every_adapter_declares_name_and_capabilities():
 
 def test_undeclared_capability_prints_its_fallback_and_exits_nonzero():
     with pytest.raises(SystemExit) as exc:
-        contract.require(hevy, "push_plan")
+        contract.require(hevy, "check")
     assert exc.value.code not in (0, None)
-    assert "hevy does not support push_plan" in str(exc.value.code)
-    assert contract.FALLBACKS["push_plan"] in str(exc.value.code)
+    assert "hevy does not support check" in str(exc.value.code)
+    assert contract.FALLBACKS["check"] in str(exc.value.code)
 
 
 def test_apps_lists_both_adapters_with_capabilities(capsys):
@@ -120,7 +120,7 @@ def test_apps_lists_both_adapters_with_capabilities(capsys):
     out = capsys.readouterr().out
     assert "liftosaur" in out and "hevy" in out
     assert "pull_bodyweight" in out
-    assert "push_plan: not supported" in out
+    assert "check: not supported" in out
 
 
 def test_use_writes_the_app_block(api, capsys):
