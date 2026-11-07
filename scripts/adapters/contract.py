@@ -39,12 +39,26 @@ OPERATIONS = tuple(FALLBACKS)
 
 _NOT_ADAPTERS = {"http", "contract"}
 
+# Where Adapters are looked for: this package's own directory, plus whatever a test
+# adds with add_adapter_dir() (a throwaway stub Adapter for the contract suite).
+# Nothing in a user's store or environment ever extends it: Adapters are built in
+# the skill repo.
+ADAPTER_DIRS: list[pathlib.Path] = [pathlib.Path(__file__).resolve().parent]
+
+
+def add_adapter_dir(path) -> None:
+    """TEST SEAM. Make the modules in `path` discoverable as Adapters."""
+    import adapters  # the package this module belongs to
+    path = pathlib.Path(path).resolve()
+    if path not in ADAPTER_DIRS:
+        ADAPTER_DIRS.append(path)
+        adapters.__path__.append(str(path))
+
 
 def names() -> list[str]:
-    """Module names of every shipped Adapter, sorted."""
-    root = pathlib.Path(__file__).resolve().parent
-    return sorted(m.name for m in pkgutil.iter_modules([str(root)])
-                  if m.name not in _NOT_ADAPTERS and not m.name.startswith("_"))
+    """Module names of every Adapter, sorted."""
+    return sorted({m.name for m in pkgutil.iter_modules([str(d) for d in ADAPTER_DIRS])
+                   if m.name not in _NOT_ADAPTERS and not m.name.startswith("_")})
 
 
 def load(name: str):
@@ -168,3 +182,66 @@ def set_program_id(name: str, program_id: str) -> None:
     path = profile_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(profile, indent=2) + "\n")
+
+
+# --- native progression and the drift guard ---------------------------------
+#
+# An Adapter whose app runs Progression Rules itself declares `NATIVE_PROGRESSION =
+# True` (absent or False otherwise) and defines `prescriptions(payload, week)`: the
+# working sets the app's program (a `get_plan` payload) prescribes for one week, as
+# [(day, exercise, [(reps, load_kg | None, amrap), ...]), ...] in program order, or
+# None when the program has no such week. Warmups, comments, timers, supersets and
+# progress fields are not part of it. `app.py update` compares that with the
+# Canonical Plan before writing.
+
+def native_progression(adapter) -> bool:
+    return getattr(adapter, "NATIVE_PROGRESSION", False) is True
+
+
+def plan_prescriptions(plan: dict, week: int):
+    """The Canonical Plan's working sets for `week`, in the shape `prescriptions` returns."""
+    wk = next((w for w in plan["weeks"] if w["number"] == week), None)
+    if wk is None:
+        return None
+    return [(day["name"], ex["exercise"],
+             [(s["reps"], s.get("load_kg"), s["kind"] == "failure")
+              for s in ex["sets"] if s["kind"] != "warmup"])
+            for day in wk["days"] for ex in day["exercises"]]
+
+
+def _norm(sets) -> tuple:
+    """No load and a 0 kg load are the same thing (bodyweight work); loads match to 0.01 kg."""
+    return tuple((reps, round(load or 0, 2), bool(amrap)) for reps, load, amrap in sets)
+
+
+def _show(sets) -> str:
+    groups: list[list] = []
+    for item in _norm(sets):
+        if groups and groups[-1][0] == item:
+            groups[-1][1] += 1
+        else:
+            groups.append([item, 1])
+    return ", ".join(f"{n}x{reps}{'+' if amrap else ''} @ {load:g}kg"
+                     for (reps, load, amrap), n in groups) or "(no sets)"
+
+
+def drift(app_sets, plan_sets) -> list[tuple]:
+    """Differences between two `prescriptions` lists as (day, exercise, app text, plan
+    text); "(absent)" marks a side that lacks the exercise. Empty means no drift."""
+    def keyed(rows):
+        seen: dict = {}
+        out = {}
+        for day, ex, sets in rows or []:
+            n = seen[(day, ex)] = seen.get((day, ex), 0) + 1
+            out[(day, ex, n)] = sets
+        return out
+    a, p = keyed(app_sets), keyed(plan_sets)
+    rows = []
+    for key in list(p) + [k for k in a if k not in p]:
+        mine, theirs = a.get(key), p.get(key)
+        if mine is not None and theirs is not None and _norm(mine) == _norm(theirs):
+            continue
+        label = key[1] + (f" #{key[2]}" if key[2] > 1 else "")
+        rows.append((key[0], label, _show(mine) if mine is not None else "(absent)",
+                     _show(theirs) if theirs is not None else "(absent)"))
+    return rows

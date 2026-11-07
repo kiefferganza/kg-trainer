@@ -15,6 +15,8 @@ import paths
 from adapters import contract
 from adapters import hevy
 from adapters import http as apphttp
+from contract_fixtures.hevy import (BENCH, MEASUREMENTS, WORKOUTS,  # noqa: E402
+                                    _workout, workout_pages)
 
 KEY = "00000000-hevy-secret-key"
 
@@ -33,38 +35,6 @@ class Resp:
 
     def __exit__(self, *a):
         return False
-
-
-def _set(i, kg, reps, rpe=None, kind="normal"):
-    return {"index": i, "type": kind, "weight_kg": kg, "reps": reps, "rpe": rpe,
-            "distance_meters": None, "duration_seconds": None, "custom_metric": None}
-
-
-def _workout(wid, start, exercises, title="Upper A"):
-    return {"id": wid, "title": title, "description": "", "start_time": start,
-            "end_time": start.replace("T10", "T11"), "exercises": exercises}
-
-
-BENCH = {"index": 0, "title": "Bench Press (Barbell)", "exercise_template_id": "AAAA0001",
-         "notes": "", "sets": [_set(0, 60, 8, kind="warmup"), _set(1, 80, 8, rpe=8.5),
-                               _set(2, 80, 7)]}
-CURL = {"index": 1, "title": "Zottman Curl (Dumbbell)", "exercise_template_id": "BBBB0002",
-        "notes": "", "sets": [_set(0, 14, 10)]}
-PULLDOWN = {"index": 0, "title": "Lat Pulldown (Cable)", "exercise_template_id": "CCCC0003",
-            "notes": "", "sets": [_set(0, 60, 10, rpe=7)]}
-
-WORKOUTS = [  # 3 workouts, newest first, pageSize 10 -> page_count 1 normally
-    _workout("w3", "2026-10-06T10:00:00+00:00", [PULLDOWN]),
-    _workout("w2", "2026-10-02T10:00:00+00:00", [BENCH, CURL]),
-    _workout("w1", "2026-09-28T10:00:00+00:00", [BENCH]),
-]
-
-MEASUREMENTS = [
-    {"id": 3, "date": "2026-10-05", "weight_kg": 80.4, "created_at": "2026-10-05T07:00:00Z"},
-    {"id": 2, "date": "2026-10-04", "weight_kg": None, "created_at": "2026-10-04T07:00:00Z"},
-    {"id": 1, "date": "2026-10-03", "weight_kg": 80.9, "created_at": "2026-10-03T07:00:00Z"},
-    {"id": 0, "date": "2026-10-03", "weight_kg": 81.1, "created_at": "2026-10-03T06:00:00Z"},
-]
 
 
 @pytest.fixture
@@ -90,22 +60,7 @@ def api(monkeypatch, tmp_path):
     return state
 
 
-def workout_pages(workouts, per=10):
-    chunks = [workouts[i:i + per] for i in range(0, len(workouts), per)] or [[]]
-    return [{"page": i + 1, "page_count": len(chunks), "workouts": c}
-            for i, c in enumerate(chunks)]
-
-
 # --- contract -------------------------------------------------------------
-
-def test_every_adapter_declares_name_and_capabilities():
-    assert contract.names() == ["hevy", "liftosaur"]
-    for adapter in contract.all_adapters():
-        assert {"ping", "pull_history"} <= adapter.CAPABILITIES
-        for op in adapter.CAPABILITIES:
-            assert callable(getattr(adapter, op))
-        assert adapter.CAPABILITIES <= set(contract.OPERATIONS)
-
 
 def test_undeclared_capability_prints_its_fallback_and_exits_nonzero():
     with pytest.raises(SystemExit) as exc:

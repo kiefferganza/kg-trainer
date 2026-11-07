@@ -5,6 +5,7 @@ import json
 import pathlib
 import subprocess
 import sys
+import urllib.parse
 
 import pytest
 
@@ -16,8 +17,11 @@ from adapters import contract
 from adapters import hevy
 from adapters import liftosaur as client
 
-APP_MODULES = {"liftosaur", "hevy", "adapters.liftosaur", "adapters.hevy"}
-APP_URLS = ("liftosaur.com", "hevyapp.com")
+# Derived from the shipped Adapters, so a new one is guarded with no edit here. An
+# Adapter exposes its base URL as BASE.
+APP_MODULES = {m for n in contract.names() for m in (n, f"adapters.{n}")}
+APP_URLS = tuple(".".join(urllib.parse.urlparse(contract.load(n).BASE).hostname.split(".")[-2:])
+                 for n in contract.names() if hasattr(contract.load(n), "BASE"))
 
 # Outside scripts/adapters/, these two are app-specific on purpose. Both are
 # standalone CLIs that nothing else imports.

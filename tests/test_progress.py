@@ -13,7 +13,7 @@ import analyze
 import app
 import liftohistory
 import plan as planmod
-from adapters import hevy
+from adapters import contract, hevy
 
 # Fixtures and the HTTP double shared with the Hevy write tests.
 from test_hevy_write import api, store  # noqa: F401  (pytest fixtures)
@@ -96,7 +96,8 @@ def week2(new, exercise, day="Upper A"):
 
 def test_linear_progresses_every_set_when_all_were_done(plan):
     new, rows, _ = run(plan, session(**all_done()))
-    assert week2(new, "Lat Pulldown") == [(10, 57.5, "working")] * 3
+    # the authored week 2 (57.5) takes the +2.5 too: the change is added to every later week
+    assert week2(new, "Lat Pulldown") == [(10, 60, "working")] * 3
     assert rows["Lat Pulldown"]["action"] == "progressed"
 
 
@@ -139,19 +140,22 @@ def test_linear_holds_a_missed_day_but_progresses_the_day_that_was_logged(plan):
 
 def test_double_adds_a_rep_to_every_set_at_the_same_load(plan):
     new, rows, _ = run(plan, session(**all_done()))
-    assert week2(new, "Bench Press") == [(8, 60, "warmup")] + [(7, 80, "working")] * 3
+    # week 2 keeps its authored 82.5 kg and gains the rep
+    assert week2(new, "Bench Press") == [(8, 60, "warmup")] + [(7, 82.5, "working")] * 3
 
 
 def test_double_adds_a_rep_only_to_the_sets_that_hit_their_reps(plan):
     new, _, _ = run(plan, session(**all_done(**{"Bench Press": [(6, 80), (6, 80), (5, 80)]})))
-    assert week2(new, "Bench Press")[1:] == [(7, 80, "working"), (7, 80, "working"), (6, 80, "working")]
+    assert week2(new, "Bench Press")[1:] == [(7, 82.5, "working"), (7, 82.5, "working"),
+                                             (6, 82.5, "working")]
 
 
 def test_double_at_the_top_of_the_range_adds_load_and_resets_to_low(plan):
     for e in plan["weeks"][0]["days"][0]["exercises"][:1]:
         e["sets"] = [_set(8, 60, "warmup")] + [_set(8, 80)] * 3
     new, rows, _ = run(plan, session(**all_done(**{"Bench Press": [(8, 80)] * 3})))
-    assert week2(new, "Bench Press")[1:] == [(6, 82.5, "working")] * 3
+    # at the top: reps are `low` (absolute) in every week and +2.5 kg is added to week 2's 82.5
+    assert week2(new, "Bench Press")[1:] == [(6, 85, "working")] * 3
     assert rows["Bench Press"]["action"] == "progressed"
 
 
@@ -169,7 +173,7 @@ def test_double_holds_when_nothing_was_hit_and_on_a_missing_session(plan):
 
 def test_reps_threshold_adds_load_when_total_reps_reach_the_threshold(plan):
     new, rows, _ = run(plan, session(**all_done(**{"Bicep Curl, Cable": [(12, 20), (13, 20)]})))
-    assert week2(new, "Bicep Curl, Cable") == [(12, 22.5, "working")] * 2
+    assert week2(new, "Bicep Curl, Cable") == [(12, 22.5, "working")] * 2  # authored 20 + 2.5
     assert rows["Bicep Curl, Cable"]["action"] == "progressed"
 
 
@@ -215,14 +219,51 @@ def test_a_deload_week_is_reported_not_progressed(plan):
     assert rows["Lat Pulldown"]["rule"].startswith("linear")
 
 
-def test_progress_does_not_overwrite_a_deload_next_week(plan):
+def rows_by(rows):
+    return {r["exercise"]: r for r in rows}
+
+
+def test_a_fired_rule_reaches_a_deload_next_week_keeping_its_authored_offset(plan):
     plan["current_week"] = 2
     new, rows, info = planmod.progress_plan(plan, [session(week=2, **all_done(**{
         "Lat Pulldown": [(10, 57.5)] * 3}))])
     assert info["advanced"] and new["current_week"] == 3
+    # week 3 is a deload (3 x 10 @ 45, rule overridden to linear): it gains the +2.5 as well
+    assert [(s["reps"], s["load_kg"]) for s in week3(new, "Lat Pulldown")[0]] == [(10, 47.5)] * 3
+    assert rows_by(rows)["Lat Pulldown"]["action"] == "progressed"
+    # a held exercise does not repeat this week into the deload
+    new, rows, _ = planmod.progress_plan(plan, [session(week=2, **all_done(**{
+        "Lat Pulldown": [(10, 50)] * 3}))])
+    assert rows_by(rows)["Lat Pulldown"]["action"] == "held"
     assert week3(new, "Lat Pulldown") == week3(plan, "Lat Pulldown")
-    r = {r["exercise"]: r for r in rows}["Lat Pulldown"]
-    assert r["action"] == "unchanged" and "deload" in r["why"]
+
+
+def test_a_fired_rule_changes_the_week_just_done_and_every_later_week(plan):
+    plan["weeks"].append(_week(4, (6, 85), 60, 20, 8, 160))
+    new, _, _ = run(plan, session(**all_done()))
+    for n, bench in ((1, 80), (2, 82.5), (3, 70), (4, 85)):
+        wk = next(w for w in new["weeks"] if w["number"] == n)
+        sets = [s for s in wk["days"][0]["exercises"][0]["sets"] if s["kind"] != "warmup"]
+        assert {s["reps"] for s in sets} == {7} and {s["load_kg"] for s in sets} == {bench}, n
+    # Liftosaur's updated program text also shows the week just done progressed (3x7 at 80 kg)
+    assert new["weeks"][0] != plan["weeks"][0]
+
+
+def test_a_none_rule_or_a_deload_current_week_triggers_nothing_in_later_weeks(plan):
+    new, _, _ = run(plan, session(**all_done()))
+    assert week2(new, "Lateral Raise") == week2(plan, "Lateral Raise")      # rule none
+    assert week3(new, "Lateral Raise") == week3(plan, "Lateral Raise")
+    plan["current_week"] = 3
+    plan["weeks"].append(_week(4, (6, 82.5), 57.5, 20, 8, 160))
+    new, rows, _ = planmod.progress_plan(plan, [session(week=3, date="2026-11-20", **{
+        "Bench Press": [(6, 70)] * 3, "Lat Pulldown": [(10, 45)] * 3})])
+    wk4 = lambda p: next(w for w in p["weeks"] if w["number"] == 4)["days"][0]["exercises"]  # noqa: E731
+    by = {e["exercise"]: e["sets"] for e in wk4(new)}
+    old = {e["exercise"]: e["sets"] for e in wk4(plan)}
+    assert by["Bench Press"] == old["Bench Press"]                  # deload: rule off, nothing fires
+    assert by["Bicep Curl, Cable"] == old["Bicep Curl, Cable"]
+    # only the lift the deload names a rule for (Lat Pulldown, linear) carries on into week 4
+    assert [s["load_kg"] for s in by["Lat Pulldown"]] == [60] * 3
 
 
 def week3(plan, exercise):
@@ -315,7 +356,7 @@ def test_cli_writes_the_next_week_advances_and_prints_the_table(planfile, tmp_pa
     planmod.cmd_progress(ns(plan=str(planfile), since=None, dry_run=False))
     out = capsys.readouterr().out
     saved = json.loads(planfile.read_text())
-    assert saved["current_week"] == 2 and week2(saved, "Lat Pulldown")[0][1] == 57.5
+    assert saved["current_week"] == 2 and week2(saved, "Lat Pulldown")[0][1] == 60
     assert "week 2 before" in out and "week 2 after" in out and "run by liftosaur" in out
     assert "Nothing was sent to the app" in out
     assert planmod.validate_plan(saved, analyze.load_muscles()) == []
@@ -335,23 +376,8 @@ def test_cli_dry_run_and_no_log_write_nothing(planfile, tmp_path, monkeypatch, c
 
 # --- agreement with Liftosaur's recorded playground run -------------------
 
-def liftosaur_week1_exercise(text, name):
-    """Sets (count-expanded (reps, kg)) Liftosaur wrote for an exercise in Week 1 Upper A of
-    updatedProgramText. Handles `3x7 / 80kg 180s` and `2x10 57.5kg, 1x10 47.5kg`."""
-    week1 = text.split("# Week 2")[0]
-    line = next(l for l in week1.splitlines() if l.startswith(name + " /"))
-    parts = [p.strip() for p in line.split(" / ")]
-    groups, tail = [g.strip() for g in parts[1].split(",")], parts[2].split()
-    out = []
-    for g in groups:
-        tokens = g.split()
-        count, reps = tokens[0].rstrip("+").split("x")
-        weight = tokens[1] if len(tokens) > 1 else tail[0]
-        out += [(int(reps), float(weight.removesuffix("kg")))] * int(count)
-    return out
-
-
-def test_progress_agrees_with_liftosaurs_recorded_finish_workout():
+def recorded_progression():
+    """(our progressed plan, rows, Liftosaur's updatedProgramText) for the recorded run."""
     rec = json.loads((FIX / "playground_finish.json").read_text())
     plan = json.loads((FIX / "liftosaur_plan.json").read_text())
     plan["created"] = "2026-11-01"   # the run was recorded the day before the fixture's date
@@ -361,23 +387,109 @@ def test_progress_agrees_with_liftosaurs_recorded_finish_workout():
     assert len(logged) == 1 and logged[0]["week"] == 1
     new, rows, info = planmod.progress_plan(plan, logged)
     assert info["advanced"] and new["current_week"] == 2
-    got = {r["exercise"]: r for r in rows}
-    updated = rec["response"]["updatedProgramText"]
-    for name in ("Bench Press", "Lat Pulldown"):
-        wk2 = next(e for d in next(w for w in new["weeks"] if w["number"] == 2)["days"]
-                   if d["name"] == "Upper A" for e in d["exercises"] if e["exercise"] == name)
-        mine = [(s["reps"], s["load_kg"]) for s in wk2["sets"] if s["kind"] != "warmup"]
-        assert mine == liftosaur_week1_exercise(updated, name), name
-        assert got[name]["action"] == "progressed"
-    # Liftosaur's concrete numbers, spelled out
-    assert liftosaur_week1_exercise(updated, "Bench Press") == [(7, 80.0)] * 3
-    assert liftosaur_week1_exercise(updated, "Lat Pulldown") == [
-        (10, 57.5), (10, 57.5), (10, 47.5), (12, 42.5)]
-    # The fixture's own authored week 2 (82.5 kg bench, two lat pulldown sets) is overwritten:
-    old = next(w for w in plan["weeks"] if w["number"] == 2)["days"][0]["exercises"][0]["sets"]
-    assert [s["load_kg"] for s in old] == [82.5] * 3
-    # and a Native Rule exercise is left to the app
+    return new, {r["exercise"]: r for r in rows}, rec["response"]["updatedProgramText"]
+
+
+def liftosaur_week(text, week):
+    """{(day, exercise): [(reps, kg, amrap), ...]} for one week of Liftosaur's own program
+    text, parsed from its reformatted lines (`3x7 / 82.5kg 180s`, `2x10 57.5kg, 1x12+ 42.5kg`)."""
+    from adapters import liftosaur
+    return {(d, e): sets for d, e, sets in liftosaur.parse_program(text)[week]}
+
+
+def test_progress_agrees_with_liftosaurs_recorded_finish_workout_in_every_week():
+    new, got, updated = recorded_progression()
+    weeks = sorted(w["number"] for w in new["weeks"])
+    assert weeks == [1, 2, 3]
+    for n in weeks:
+        mine = {(d, e): sets for d, e, sets in contract.plan_prescriptions(new, n)}
+        theirs = liftosaur_week(updated, n)
+        assert mine.keys() == theirs.keys(), n
+        for key in mine:   # every exercise, not only the two that progressed
+            assert contract._norm(mine[key]) == contract._norm(theirs[key]), (n, key)
+    # Liftosaur's concrete numbers, spelled out: the weeks differ in their authored
+    # offsets and each takes the same change.
+    bench = {n: liftosaur_week(updated, n)[("Upper A", "Bench Press")] for n in weeks}
+    assert bench[1] == [(7, 80.0, False)] * 3          # 3x6 80kg
+    assert bench[2] == [(7, 82.5, False)] * 3          # 3x6 82.5kg
+    assert bench[3] == [(7, 70.0, False)] * 2          # deload 2x6 70kg, `progress: none`
+    lat = {n: liftosaur_week(updated, n)[("Upper A", "Lat Pulldown")] for n in weeks}
+    assert lat[1] == [(10, 57.5, False)] * 2 + [(10, 47.5, False), (12, 42.5, True)]
+    assert lat[2] == [(10, 60.0, False)] * 2           # 57.5 + 2.5
+    assert lat[3] == [(10, 47.5, False)] * 2           # deload 45 + 2.5
+    assert got["Bench Press"]["action"] == got["Lat Pulldown"]["action"] == "progressed"
+    # Not logged in the recorded run, so nothing moved in either program, and a Native
+    # Rule exercise is left to the app.
+    assert got["Bicep Curl, Cable"]["action"] == "held"
     assert got["Leg Press"]["why"] == "run by liftosaur"
+
+
+# --- agreement with the dp top/mid range and sum recordings ---------------
+
+def plan_from_program(text):
+    """A Canonical Plan from a recorded Liftoscript program: rules from each exercise's
+    `progress:` in week 1, sets from the parser."""
+    import re
+    from adapters import liftosaur
+    rules = {}
+    for line in text.splitlines():
+        m = re.search(r"progress: (lp|dp|sum)\(([^)]*)\)", line)
+        if not m:
+            continue
+        args = [a.strip() for a in m[2].split(",")]
+        kg = lambda x: float(x.removesuffix("kg"))  # noqa: E731
+        rules[line.split(" / ")[0]] = (
+            {"rule": "linear", "increment_kg": kg(args[0])} if m[1] == "lp" else
+            {"rule": "double", "increment_kg": kg(args[0]), "low": int(args[1]), "high": int(args[2])}
+            if m[1] == "dp" else
+            {"rule": "reps_threshold", "total": int(args[0]), "increment_kg": kg(args[1])})
+    weeks = []
+    for n, rows in sorted(liftosaur.parse_program(text).items()):
+        days = {}
+        for day, name, sets in rows:
+            days.setdefault(day, []).append(_ex(name, [_set(r, kg, "working") for r, kg, _ in sets]))
+        weeks.append({"number": n, "phase": "x", "deload": False,
+                      "days": [{"name": d, "exercises": e} for d, e in days.items()]})
+    return {"schema": 1, "name": "rec", "created": "2026-11-01", "current_week": 1,
+            "weeks": weeks, "progression": rules}
+
+
+@pytest.mark.parametrize("fixture,expected", [
+    ("playground_top_of_range.json", {
+        # dp at the top: reps -> low in every week, load += 2.5 on each week's own load;
+        # sum fired: load -> logged 20 + 2.5 everywhere; lp(1kg): +1 on 8 / 9 / 6
+        "Bench Press": [[(6, 82.5)] * 3, [(6, 85.0)] * 3, [(6, 72.5)] * 2],
+        "Bicep Curl, Cable": [[(15, 22.5)] * 2, [(12, 22.5)] * 2, [(15, 22.5)] * 1],
+        "Lateral Raise": [[(15, 9.0)] * 2, [(12, 10.0)] * 2, [(15, 7.0)] * 1]}),
+    ("playground_mid_range.json", {
+        # dp below the top: reps -> logged 6 + 1 in every week, loads untouched;
+        # sum(15) fired on 100 kg: load -> 102.5 in every week, reps untouched
+        "Bench Press": [[(7, 80.0)] * 3, [(7, 82.5)] * 3, [(7, 70.0)] * 2],
+        "Squat": [[(5, 102.5)] * 3, [(3, 102.5)] * 3, [(5, 102.5)] * 2]}),
+])
+def test_progress_agrees_with_the_dp_and_sum_recordings_in_every_week(fixture, expected):
+    from adapters import liftosaur
+    rec = json.loads((FIX / fixture).read_text())
+    updated = rec["response"]["updatedProgramText"]
+    plan = plan_from_program(rec["program_text"])
+    # The recorded workout is used as logged. In the top-of-range run the playground
+    # rounded a prescribed 8 kg Lateral Raise to 7.5 kg and logged `target: ... 7.5kg`;
+    # progress counts it as done because it reached the app's own target.
+    logged = liftohistory.parse_liftohistory(rec["response"]["workout"])
+    new, rows, info = planmod.progress_plan(plan, logged)
+    assert info["advanced"]
+    theirs_all = liftosaur.parse_program(updated)
+    for n in (1, 2, 3):
+        mine = {(d, e): sets for d, e, sets in contract.plan_prescriptions(new, n)}
+        theirs = {(d, e): sets for d, e, sets in theirs_all[n]}
+        assert mine.keys() == theirs.keys()
+        for key in mine:
+            assert contract._norm(mine[key]) == contract._norm(theirs[key]), (fixture, n, key)
+    for name, per_week in expected.items():
+        for n, want in zip((1, 2, 3), per_week):
+            got = [(r, kg) for r, kg, _ in {e: s for d, e, s in theirs_all[n]}[name]]
+            assert got == want, (fixture, name, n)
+        assert {r["exercise"]: r["action"] for r in rows}[name] == "progressed"
 
 
 # --- progress, then update moves a Hevy account to the next week ----------
@@ -413,6 +525,50 @@ def test_progress_then_update_pushes_the_next_week_to_hevy(store, api, tmp_path,
     puts = {p[1]: p[2]["routine"] for p in api.log if p[0] == "PUT"}
     bench, lat = puts["/v1/routines/r1"]["exercises"]
     assert [s["rep_range"] for s in bench["sets"]] == [{"start": 6, "end": 8}] * 3  # Hevy shows the range
-    assert {s["weight_kg"] for s in bench["sets"]} == {80}            # double: reps up, load held
-    assert {s["weight_kg"] for s in lat["sets"]} == {57.5}            # linear: +2.5 on 55
+    assert {s["weight_kg"] for s in bench["sets"]} == {82.5}          # authored week 2 load, rep added
+    assert {s["weight_kg"] for s in lat["sets"]} == {60}              # authored week 2 57.5, +2.5
     assert hevy.compile(saved)["week"] == 2
+
+
+# --- the app's own rounding --------------------------------------------------
+
+def with_target(sess, exercise, target):
+    for e in sess["exercises"]:
+        if e["title"] == exercise:
+            e["target"] = target
+    return sess
+
+
+def test_a_load_the_app_rounded_down_counts_as_done(plan):
+    # Live 2026-11-07: Liftosaur rounded a prescribed 8 kg Lateral Raise to 7.5 kg,
+    # logged its target as 7.5 kg, and counted the sets done. The skill must agree.
+    plan["progression"]["Lat Pulldown"] = {"rule": "linear", "increment_kg": 2.5}
+    sess = with_target(session(**all_done(**{"Lat Pulldown": [(10, 52.5)] * 3})),
+                       "Lat Pulldown", "3x10 52.5kg 90s")
+    _, rows, _ = run(plan, sess)
+    assert rows["Lat Pulldown"]["action"] == "progressed"
+
+
+def test_without_an_app_target_a_lighter_load_still_holds(plan):
+    _, rows, _ = run(plan, session(**all_done(**{"Lat Pulldown": [(10, 52.5)] * 3})))
+    assert rows["Lat Pulldown"]["action"] == "held"
+
+
+def test_a_logged_load_below_the_apps_own_target_still_holds(plan):
+    sess = with_target(session(**all_done(**{"Lat Pulldown": [(10, 52.5)] * 3})),
+                       "Lat Pulldown", "3x10 55kg 90s")
+    _, rows, _ = run(plan, sess)
+    assert rows["Lat Pulldown"]["action"] == "held"
+
+
+def test_an_app_target_above_the_prescription_never_raises_the_bar(plan):
+    sess = with_target(session(**all_done()), "Lat Pulldown", "3x10 60kg 90s")
+    _, rows, _ = run(plan, sess)
+    assert rows["Lat Pulldown"]["action"] == "progressed"
+
+
+def test_the_app_target_is_matched_set_by_set(plan):
+    sess = with_target(session(**all_done(**{"Lat Pulldown": [(10, 55), (10, 55), (10, 52.5)]})),
+                       "Lat Pulldown", "2x10 55kg 90s, 1x10 52.5kg 90s")
+    _, rows, _ = run(plan, sess)
+    assert rows["Lat Pulldown"]["action"] == "progressed"

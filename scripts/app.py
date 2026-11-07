@@ -10,10 +10,14 @@ Usage:
   app.py exercises <pattern>   # canonical names matching the pattern
   app.py compile <plan> [--week N]          # the app's payload for one week (local)
   app.py push <plan> --name NAME [--week N] [--yes]   # create the plan in the app
-  app.py update <plan> --id ID [--week N] [--yes]     # rewrite an existing plan
+  app.py update <plan> --id ID [--week N] [--yes] [--force]   # rewrite an existing plan
   app.py get <id|current>      # the app's current plan
   app.py check <plan>          # local stats beside the app's server-side check, if it has one
 Writes (push, update) ask first; --yes skips the prompt.
+An app that runs Progression Rules itself (NATIVE_PROGRESSION) is fetched first by
+`update`: if its current week differs from the Canonical Plan (the app progressed
+weights the plan has not recorded), update refuses and shows both. Run
+`plan.py progress` to record the progression, or pass --force to overwrite anyway.
 
 An operation the Active App does not declare prints its Fallback and exits
 non-zero. A store that has never chosen an app is told to run `app.py use <name>`.
@@ -127,10 +131,41 @@ def cmd_push(a):
     print(f"Pushed to {adapter.NAME}. Plan id: {plan_id} (recorded as app.program_id)")
 
 
+def drift_guard(adapter, canonical, plan_id):
+    """Rows where a native-progression app's current week differs from the Canonical
+    Plan (empty when the app has no native progression, or nothing differs)."""
+    if not contract.native_progression(adapter):
+        return []
+    payload = contract.require(adapter, "get_plan")(plan_id)
+    week = canonical["current_week"]
+    app_sets = adapter.prescriptions(payload, week)
+    return contract.drift(app_sets, contract.plan_prescriptions(canonical, week))
+
+
+def print_drift(adapter, canonical, rows):
+    week = canonical["current_week"]
+    print(f"{adapter.NAME} week {week} differs from the Canonical Plan in {len(rows)} place(s):")
+    head = ("day", "exercise", adapter.NAME, "Canonical Plan")
+    widths = [max(len(r[i]) for r in [head, *rows]) for i in range(4)]
+    for row in [head, *rows]:
+        print("  " + "  ".join(c.ljust(w) for c, w in zip(row, widths)).rstrip())
+
+
 def cmd_update(a):
     adapter = active()
     contract.require(adapter, "update_plan")
     _, compiled = _compiled(a)
+    canonical = load_plan(a.plan)
+    rows = drift_guard(adapter, canonical, a.id)
+    if rows:
+        print_drift(adapter, canonical, rows)
+        if not getattr(a, "force", False):
+            sys.exit(f"Refusing to overwrite: {adapter.NAME} runs Progression Rules itself and "
+                     "its current week no longer matches the Canonical Plan, so this update "
+                     "would undo what the app progressed. Run `plan.py progress` to record the "
+                     "app's progression, or pass --force to overwrite the app anyway. "
+                     "Nothing was written.")
+        print("--force: overwriting anyway.")
     confirm(f"Overwrite plan {a.id} in {adapter.NAME} with {a.plan}? "
             f"{adapter.NAME} cannot undo it.", a.yes)
     plan_id = adapter.update_plan(compiled, a.id)
@@ -219,6 +254,8 @@ def main():
     c.set_defaults(fn=cmd_push)
     c = sub.add_parser("update"); c.add_argument("plan"); c.add_argument("--id", required=True)
     c.add_argument("--week", type=int); c.add_argument("--yes", action="store_true")
+    c.add_argument("--force", action="store_true",
+                   help="write even when a native-progression app has drifted from the plan")
     c.set_defaults(fn=cmd_update)
     c = sub.add_parser("get"); c.add_argument("id"); c.set_defaults(fn=cmd_get)
     c = sub.add_parser("check"); c.add_argument("plan"); c.set_defaults(fn=cmd_check)

@@ -17,19 +17,11 @@ import paths
 from adapters import contract
 from adapters import hevy
 from adapters import http as apphttp
+from contract_fixtures.hevy import CATALOGUE, FOLDER, get_shape  # noqa: E402
 
 FIX = pathlib.Path(__file__).parent / "fixtures"
 PLAN = json.loads((FIX / "hevy_plan.json").read_text())
 GOLDEN = FIX / "hevy_compiled_week2.golden.json"
-
-CATALOGUE = [
-    {"id": "AAAA0001", "title": "Bench Press (Barbell)"},
-    {"id": "AAAA0002", "title": "Squat (Barbell)"},
-    {"id": "AAAA0003", "title": "Lat Pulldown (Cable)"},
-    {"id": "AAAA0004", "title": "Bicep Curl (Cable)"},
-    {"id": "AAAA0005", "title": "Pull Up"},
-]
-
 
 class Resp:
     status = 200
@@ -157,9 +149,6 @@ def test_hevy_declares_no_check_and_the_cli_says_so(store, capsys):
 
 # --- push ------------------------------------------------------------------
 
-FOLDER = {"routine_folder": {"id": 3670546, "index": 0, "title": "Block"}}
-
-
 def routine_reply(rid):
     return {"routine": {"id": rid, "title": "x"}}
 
@@ -197,15 +186,6 @@ def test_push_without_a_folder_id_is_a_failure(store, api):
 
 
 # --- get and update --------------------------------------------------------
-
-def get_shape(rid, title, folder=3670546):
-    """A routine as GET returns it: with exercise/set `index` and exercise `title`."""
-    return {"id": rid, "title": title, "folder_id": folder, "created_at": "x", "updated_at": "y",
-            "exercises": [{"index": 0, "title": "Squat (Barbell)", "exercise_template_id": "AAAA0002",
-                           "rest_seconds": 60, "notes": "n", "superset_id": None,
-                           "sets": [{"index": 0, "type": "normal", "weight_kg": 1, "reps": 1,
-                                     "rep_range": None}]}]}
-
 
 def serve_folder(api, routines):
     api.routes[("GET", "/v1/routine_folders/3670546")] = FOLDER

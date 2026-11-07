@@ -19,33 +19,10 @@ import analyze
 import checkin
 from adapters import contract
 from adapters import http as apphttp
+from contract_fixtures.liftosaur import PAGES, WEIGHTS  # noqa: E402
 
 FIX = pathlib.Path(__file__).resolve().parent / "fixtures"
 GOLDEN = FIX / "golden"
-
-SECOND = """2026-10-06T08:30:00Z / program: "M1" / dayName: "Lower A" / week: 3 / dayInWeek: 2 / exercises: {
-  Squat, Barbell / 3x5 120kg @8+ / warmup: 2x5 60kg
-  Romanian Deadlift / 3x8 90kg @7
-  Custom Sled Thing / 4x10 40kg
-}
-"""
-THIRD = """2026-10-13T08:30:00Z / program: "M1" / dayName: "Upper A" / week: 4 / dayInWeek: 1 / exercises: {
-  Bench Press / 3x8 85kg @9+
-  Lat Pulldown, Cable / 3x10 55kg @8+
-}
-"""
-WEIGHTS = [  # newest first, as the API returns them
-    {"timestamp": 4, "date": "2026-10-12T07:00:00.000Z", "value": "70.1kg"},
-    {"timestamp": 3, "date": "2026-10-11T20:12:28.292Z", "value": "69.9kg"},
-    {"timestamp": 2, "date": "2026-10-11T07:00:00.000Z", "value": "70.4kg"},
-    {"timestamp": 1, "date": "2026-10-09T23:39:58.878Z", "value": "154lb"},
-    {"timestamp": 0, "date": "2026-10-08T07:00:00.000Z", "value": "garbage"},
-]
-PAGES = [  # (records, hasMore, nextCursor)
-    ([{"id": "r3", "text": THIRD}, {"id": "r2", "text": SECOND}], True, 1791000000000),
-    ([{"id": "r1", "text": (FIX / "history_sample.txt").read_text()}], False, None),
-]
-
 
 def fake_request(app, base, method, path, params=None, body=None, **kw):
     assert app == "liftosaur" and base.startswith("https://www.liftosaur.com/")

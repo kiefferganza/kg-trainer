@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Vendor Liftosaur's reference documents into references/.
+"""Vendor Liftosaur's reference documents into references/ (the exercise list) and
+references/adapters/liftosaur/ (the Liftoscript and Liftohistory docs).
 
 The Liftosaur MCP server exposes reference tools that need no authentication,
 so this runs without an API key and without a subscription. Re-run it when
@@ -30,11 +31,13 @@ import urllib.request
 MCP = "https://www.liftosaur.com/mcp"
 FEDB_URL = "https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/dist/exercises.json"
 REFS = pathlib.Path(__file__).resolve().parent.parent / "references"
+LIFTOSAUR_REFS = REFS / "adapters" / "liftosaur"
 
+# Vendored file (relative to references/) -> the MCP tool that serves it.
 TOOLS = {
     "exercises.txt": "list_exercises",
-    "liftohistory.md": "get_liftohistory_reference",
-    "liftoscript.md": "get_liftoscript_reference",
+    "adapters/liftosaur/liftohistory.md": "get_liftohistory_reference",
+    "adapters/liftosaur/liftoscript.md": "get_liftoscript_reference",
 }
 
 # 'unknown' is deliberately absent: it is only the runtime fallback of muscle_for(),
@@ -146,6 +149,7 @@ def main():
     args = parser.parse_args()
 
     REFS.mkdir(parents=True, exist_ok=True)
+    LIFTOSAUR_REFS.mkdir(parents=True, exist_ok=True)
     fetched = {}
     for filename, tool in TOOLS.items():
         fetched[filename] = mcp_tool(tool)  # fetch everything before writing anything

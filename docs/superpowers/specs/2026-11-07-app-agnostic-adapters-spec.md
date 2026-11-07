@@ -86,6 +86,17 @@ execution.
     `references/adapters/liftosaur/`. `programming.md` and `state.md` stay top-level. SKILL.md's
     description triggers name "a training app with an API" plus Liftosaur and Hevy. STEP 2's
     equipment list uses the skill's canonical equipment suffixes.
+21. **Native progression stays native; the Canonical Plan keeps up** (added 2026-11-07, see
+    ADR 0002). On an app that runs Progression Rules itself (Liftosaur), the app moves the
+    weights and `plan.py progress` only records the same change in the Canonical Plan, so the
+    two stay in step and nothing is pushed for progression alone. `progress` therefore follows
+    the app's semantics, verified live: a rule's change (a rep, or the increment) applies to
+    that exercise in **every later week of the block**, keeping the authored week-to-week ramp,
+    deload weeks included; a deload or `none` only means finishing that week's sessions
+    triggers nothing. Before `app.py update` writes to such an app, a **drift guard** fetches
+    the app's program, compares the current week's prescriptions with the Canonical Plan, and
+    refuses on any difference, showing both. The same `progress` semantics apply on apps without
+    native progression (Hevy), so every app progresses one way.
 
 ## The Adapter Contract
 
