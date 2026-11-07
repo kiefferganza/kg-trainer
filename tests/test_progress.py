@@ -472,16 +472,10 @@ def test_progress_agrees_with_the_dp_and_sum_recordings_in_every_week(fixture, e
     rec = json.loads((FIX / fixture).read_text())
     updated = rec["response"]["updatedProgramText"]
     plan = plan_from_program(rec["program_text"])
+    # The recorded workout is used as logged. In the top-of-range run the playground
+    # rounded a prescribed 8 kg Lateral Raise to 7.5 kg and logged `target: ... 7.5kg`;
+    # progress counts it as done because it reached the app's own target.
     logged = liftohistory.parse_liftohistory(rec["response"]["workout"])
-    # The playground rounds a prescribed 8 kg to the 7.5 kg its default plates make
-    # (Lateral Raise), then counts the set as done. The skill holds a set lighter than
-    # prescribed, so feed it the prescribed load for that recording artifact.
-    prescribed = {e["exercise"]: e["sets"][0]["load_kg"] for e in plan["weeks"][0]["days"][0]["exercises"]}
-    for w in logged:
-        for e in w["exercises"]:
-            for st in e["sets"]:
-                if abs(st["weight_kg"] - prescribed[e["title"]]) <= 0.5:
-                    st["weight_kg"] = prescribed[e["title"]]
     new, rows, info = planmod.progress_plan(plan, logged)
     assert info["advanced"]
     theirs_all = liftosaur.parse_program(updated)
@@ -534,3 +528,47 @@ def test_progress_then_update_pushes_the_next_week_to_hevy(store, api, tmp_path,
     assert {s["weight_kg"] for s in bench["sets"]} == {82.5}          # authored week 2 load, rep added
     assert {s["weight_kg"] for s in lat["sets"]} == {60}              # authored week 2 57.5, +2.5
     assert hevy.compile(saved)["week"] == 2
+
+
+# --- the app's own rounding --------------------------------------------------
+
+def with_target(sess, exercise, target):
+    for e in sess["exercises"]:
+        if e["title"] == exercise:
+            e["target"] = target
+    return sess
+
+
+def test_a_load_the_app_rounded_down_counts_as_done(plan):
+    # Live 2026-11-07: Liftosaur rounded a prescribed 8 kg Lateral Raise to 7.5 kg,
+    # logged its target as 7.5 kg, and counted the sets done. The skill must agree.
+    plan["progression"]["Lat Pulldown"] = {"rule": "linear", "increment_kg": 2.5}
+    sess = with_target(session(**all_done(**{"Lat Pulldown": [(10, 52.5)] * 3})),
+                       "Lat Pulldown", "3x10 52.5kg 90s")
+    _, rows, _ = run(plan, sess)
+    assert rows["Lat Pulldown"]["action"] == "progressed"
+
+
+def test_without_an_app_target_a_lighter_load_still_holds(plan):
+    _, rows, _ = run(plan, session(**all_done(**{"Lat Pulldown": [(10, 52.5)] * 3})))
+    assert rows["Lat Pulldown"]["action"] == "held"
+
+
+def test_a_logged_load_below_the_apps_own_target_still_holds(plan):
+    sess = with_target(session(**all_done(**{"Lat Pulldown": [(10, 52.5)] * 3})),
+                       "Lat Pulldown", "3x10 55kg 90s")
+    _, rows, _ = run(plan, sess)
+    assert rows["Lat Pulldown"]["action"] == "held"
+
+
+def test_an_app_target_above_the_prescription_never_raises_the_bar(plan):
+    sess = with_target(session(**all_done()), "Lat Pulldown", "3x10 60kg 90s")
+    _, rows, _ = run(plan, sess)
+    assert rows["Lat Pulldown"]["action"] == "progressed"
+
+
+def test_the_app_target_is_matched_set_by_set(plan):
+    sess = with_target(session(**all_done(**{"Lat Pulldown": [(10, 55), (10, 55), (10, 52.5)]})),
+                       "Lat Pulldown", "2x10 55kg 90s, 1x10 52.5kg 90s")
+    _, rows, _ = run(plan, sess)
+    assert rows["Lat Pulldown"]["action"] == "progressed"

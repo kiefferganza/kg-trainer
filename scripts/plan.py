@@ -34,6 +34,7 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from analyze import load_muscles  # noqa: E402  — one muscle-map loader (shipped + personal)
 from fetch_reference import muscle_for  # noqa: E402
+from liftohistory import _sets as _sets_text  # noqa: E402  — parses an app target like "2x15 7.5kg 60s"
 
 SCHEMA = 1
 SET_KINDS = ("working", "warmup", "drop", "failure")
@@ -436,21 +437,37 @@ def _find_session(workouts: list[dict], day_name: str, week_no: int, floor: str)
 
 
 def _logged_sets(session: dict, exercise: str):
-    """Non-warmup logged sets of an exercise in a session, or None if it was not done."""
+    """Non-warmup logged sets of an exercise in a session, or None if it was not done.
+
+    Where the log carries the app's own target for the exercise (Liftosaur logs
+    `target: 2x15 7.5kg 60s`), each set gets `app_target_kg`: the load the app
+    actually asked for after rounding it to the athlete's plates."""
     for e in session.get("exercises", []):
         if e.get("title") == exercise:
-            return [s for s in e.get("sets", []) if s.get("type") != "warmup"]
+            sets = [dict(s) for s in e.get("sets", []) if s.get("type") != "warmup"]
+            targets = _sets_text(e["target"], "normal") if e.get("target") else []
+            for s, t in zip(sets, targets):
+                s["app_target_kg"] = t.get("weight_kg")
+            return sets
     return None
 
 
 def _set_done(target: dict, logged: dict) -> bool:
-    """A set counts when it reached the prescribed reps at no less than the prescribed load."""
+    """A set counts when it reached the prescribed reps at no less than the prescribed load.
+
+    The load bar is the lower of the prescription and the app's own target for that
+    set, so a load the app rounded down to what the athlete can load still counts
+    (verified live 2026-11-07: Liftosaur rounded 8 kg to 7.5 kg and progressed it).
+    An app target never raises the bar above the prescription."""
     reps = logged.get("reps")
     if not (_num(reps) and reps >= target["reps"]):
         return False
     if target.get("load_kg") is not None:
+        bar = target["load_kg"]
+        if _num(logged.get("app_target_kg")):
+            bar = min(bar, logged["app_target_kg"])
         kg = logged.get("weight_kg")
-        if not (_num(kg) and kg >= target["load_kg"] - 1e-6):
+        if not (_num(kg) and kg >= bar - 1e-6):
             return False
     return True
 
